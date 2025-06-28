@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Counter - HookTML Example</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .counter-container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+
+    .counter-display {
+      font-size: 48px;
+      font-weight: bold;
+      color: #007bff;
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 2px solid #e9ecef;
+    }
+
+    .counter-controls {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+
+    .increment {
+      background: #28a745;
+      color: white;
+    }
+
+    .increment:hover {
+      background: #218838;
+      transform: translateY(-1px);
+    }
+
+    .decrement {
+      background: #dc3545;
+      color: white;
+    }
+
+    .decrement:hover {
+      background: #c82333;
+      transform: translateY(-1px);
+    }
+
+    .reset {
+      background: #6c757d;
+      color: white;
+    }
+
+    .reset:hover {
+      background: #5a6268;
+      transform: translateY(-1px);
+    }
+
+    .example-info {
+      margin-top: 30px;
+      padding: 20px;
+      background: #e7f3ff;
+      border-radius: 8px;
+      border-left: 4px solid #007bff;
+    }
+
+    .example-info h3 {
+      margin-top: 0;
+      color: #0056b3;
+    }
+
+    .example-info p {
+      margin-bottom: 0;
+      color: #495057;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="counter-container">
+    <h1>Simple Counter Example</h1>
+
+    <!-- Counter component using proper HookTML hook syntax -->
+    <div use-counter counter-initial="0">
+      <div counter-display class="counter-display">0</div>
+
+      <div class="counter-controls">
+        <button counter-decrement class="decrement">
+          − Decrement
+        </button>
+
+        <button counter-reset class="reset">
+          Reset
+        </button>
+
+        <button counter-increment class="increment">
+          + Increment
+        </button>
+      </div>
+    </div>
+
+    <div class="example-info">
+      <h3>How this works:</h3>
+      <p>
+        This example demonstrates proper HookTML hook syntax. The <code>use-counter</code>
+        attribute triggers a custom hook that finds child elements with <code>counter-*</code>
+        attributes and wires up the behavior using HookTML's built-in hooks like
+        <code>useEvents</code> and <code>useEffect</code>.
+      </p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { HookTML, signal, useEffect, useEvents, registerHook, useChildren } from '../src/index.js';
+
+    const useCounter = (el, props) => {
+      const initialValue = props.initial ? parseInt(props.initial) : 0;
+
+      const { display, increment, decrement, reset } = useChildren(el, "counter");
+
+      const count = signal(initialValue);
+
+      useEffect(() => {
+        display.textContent = count.value;
+      }, [count]);
+
+      useEvents(increment, {
+        click: () => {
+          count.value += 1;
+        }
+      });
+
+      useEvents(decrement, {
+        click: () => {
+          count.value -= 1;
+        }
+      });
+
+      useEvents(reset, {
+        click: () => {
+          count.value = initialValue;
+        }
+      });
+
+      return () => {
+        count.destroy();
+      };
+    };
+
+    registerHook(useCounter);
+
+    HookTML.start({
+      debug: true
+    }).then(() => {
+      console.log('🎉 HookTML Counter Example loaded successfully!');
+    });
+  </script>
+</body>
+
+</html>

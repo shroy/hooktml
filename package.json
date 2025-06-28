@@ -1,0 +1,47 @@
+{
+  "name": "hooktml",
+  "version": "0.1.0",
+  "description": "A reactive HTML component library with hooks-based lifecycle management",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [
+    "html",
+    "components",
+    "hooks",
+    "reactive",
+    "dom",
+    "frontend"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/hooktml.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/hooktml/issues"
+  },
+  "homepage": "https://github.com/yourusername/hooktml#readme",
+  "files": [
+    "index.js",
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "vitest",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "build": "echo 'No build step required for ES modules'",
+    "prepublishOnly": "npm test"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^1.3.1",
+    "@vitest/ui": "^1.3.1",
+    "jsdom": "^24.0.0",
+    "vitest": "^1.3.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
