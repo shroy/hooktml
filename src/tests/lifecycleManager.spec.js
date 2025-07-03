@@ -5,7 +5,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { LifecycleManager } from '../core/lifecycleManager.js'
 
 describe('LifecycleManager', () => {
+  /** @type {LifecycleManager} */
   let manager
+  /** @type {HTMLElement} */
   let element
 
   beforeEach(() => {
@@ -203,13 +205,7 @@ describe('LifecycleManager', () => {
       expect(teardown).toHaveBeenCalledTimes(1)
     })
 
-    it('should return success false for non-existent component teardown', () => {
-      const result = manager.executeComponentTeardown(element)
-      expect(result.success).toBe(false)
-      expect(result.error).toBeUndefined()
-    })
-
-    it('should execute all directive teardowns successfully', () => {
+    it('should execute directive teardowns successfully', () => {
       const teardown1 = vi.fn()
       const teardown2 = vi.fn()
       manager.registerDirective(element, teardown1, 'directive1')
@@ -218,7 +214,9 @@ describe('LifecycleManager', () => {
       const results = manager.executeDirectiveTeardowns(element)
       expect(results).toHaveLength(2)
       expect(results[0].success).toBe(true)
+      expect(results[0].error).toBeUndefined()
       expect(results[1].success).toBe(true)
+      expect(results[1].error).toBeUndefined()
       expect(teardown1).toHaveBeenCalledTimes(1)
       expect(teardown2).toHaveBeenCalledTimes(1)
     })
@@ -235,41 +233,34 @@ describe('LifecycleManager', () => {
       const results = manager.executeDirectiveTeardowns(element)
       expect(results).toHaveLength(2)
       expect(results[0].success).toBe(true)
+      expect(results[0].error).toBeUndefined()
       expect(results[1].success).toBe(false)
       expect(results[1].error).toBe(error)
       expect(teardown1).toHaveBeenCalledTimes(1)
       expect(teardown2).toHaveBeenCalledTimes(1)
     })
 
-    it('should return empty array for non-existent directive teardowns', () => {
-      const results = manager.executeDirectiveTeardowns(element)
-      expect(results).toEqual([])
-    })
-
-    it('should execute all teardowns for an element', () => {
+    it('should execute all teardowns and clean up registration', () => {
       const componentTeardown = vi.fn()
-      const directiveTeardown1 = vi.fn()
-      const directiveTeardown2 = vi.fn()
-      
+      const directiveTeardown = vi.fn()
       manager.registerComponent(element, componentTeardown)
-      manager.registerDirective(element, directiveTeardown1, 'directive1')
-      manager.registerDirective(element, directiveTeardown2, 'directive2')
+      manager.registerDirective(element, directiveTeardown, 'directive1')
       
-      const result = manager.executeAllTeardowns(element)
-      
-      expect(result.component.success).toBe(true)
-      expect(result.directives).toHaveLength(2)
-      expect(result.directives[0].success).toBe(true)
-      expect(result.directives[1].success).toBe(true)
+      const results = manager.executeTeardowns(element)
+      expect(results.component.success).toBe(true)
+      expect(results.component.error).toBeUndefined()
+      expect(results.directives).toHaveLength(1)
+      expect(results.directives[0].success).toBe(true)
+      expect(results.directives[0].error).toBeUndefined()
       
       expect(componentTeardown).toHaveBeenCalledTimes(1)
-      expect(directiveTeardown1).toHaveBeenCalledTimes(1)
-      expect(directiveTeardown2).toHaveBeenCalledTimes(1)
+      expect(directiveTeardown).toHaveBeenCalledTimes(1)
+      expect(manager.hasRegistration(element)).toBe(false)
     })
 
-    it('should handle mixed success and failure in all teardowns', () => {
-      const componentError = new Error('Component failed')
-      const directiveError = new Error('Directive failed')
+    it('should continue execution even if some teardowns fail', () => {
+      const componentError = new Error('Component teardown failed')
+      const directiveError = new Error('Directive teardown failed')
       
       const componentTeardown = vi.fn().mockImplementation(() => {
         throw componentError
@@ -283,75 +274,83 @@ describe('LifecycleManager', () => {
       manager.registerDirective(element, directiveTeardown1, 'directive1')
       manager.registerDirective(element, directiveTeardown2, 'directive2')
       
-      const result = manager.executeAllTeardowns(element)
-      
-      expect(result.component.success).toBe(false)
-      expect(result.component.error).toBe(componentError)
-      expect(result.directives).toHaveLength(2)
-      expect(result.directives[0].success).toBe(true)
-      expect(result.directives[1].success).toBe(false)
-      expect(result.directives[1].error).toBe(directiveError)
+      const results = manager.executeTeardowns(element)
+      expect(results.component.success).toBe(false)
+      expect(results.component.error).toBe(componentError)
+      expect(results.directives).toHaveLength(2)
+      expect(results.directives[0].success).toBe(true)
+      expect(results.directives[1].success).toBe(false)
+      expect(results.directives[1].error).toBe(directiveError)
       
       expect(componentTeardown).toHaveBeenCalledTimes(1)
       expect(directiveTeardown1).toHaveBeenCalledTimes(1)
       expect(directiveTeardown2).toHaveBeenCalledTimes(1)
+      expect(manager.hasRegistration(element)).toBe(false)
     })
 
-    it('should return appropriate structure for element with no teardowns', () => {
-      const result = manager.executeAllTeardowns(element)
-      
-      expect(result.component.success).toBe(false)
-      expect(result.component.error).toBeUndefined()
-      expect(result.directives).toEqual([])
+    it('should throw error for non-HTMLElement in teardown execution', () => {
+      // @ts-expect-error Testing invalid input
+      expect(() => manager.executeTeardowns(null))
+        .toThrow('[HookTML] executeTeardowns requires an HTMLElement')
     })
   })
 
-  describe('Cleanup', () => {
-    it('should clear component registration', () => {
+  describe('State Management', () => {
+    it('should track component initialization state', () => {
+      expect(manager.isInitialized(element)).toBe(false)
+      
+      manager.registerComponent(element, vi.fn())
+      expect(manager.isInitialized(element)).toBe(true)
+    })
+
+    it('should track directive initialization state', () => {
+      const directiveName = 'test-directive'
+      expect(manager.isDirectiveInitialized(element, directiveName)).toBe(false)
+      
+      manager.registerDirective(element, vi.fn(), directiveName)
+      expect(manager.isDirectiveInitialized(element, directiveName)).toBe(true)
+    })
+
+    it('should track multiple directive initializations', () => {
+      const directive1 = 'directive1'
+      const directive2 = 'directive2'
+      
+      manager.registerDirective(element, vi.fn(), directive1)
+      manager.registerDirective(element, vi.fn(), directive2)
+      
+      const directives = manager.getInitializedDirectives(element)
+      expect(directives).toHaveLength(2)
+      expect(directives).toContain(directive1)
+      expect(directives).toContain(directive2)
+    })
+
+    it('should clear state after teardown', () => {
+      const directiveName = 'test-directive'
+      
+      manager.registerComponent(element, vi.fn())
+      manager.registerDirective(element, vi.fn(), directiveName)
+      
+      manager.executeTeardowns(element)
+      
+      expect(manager.isInitialized(element)).toBe(false)
+      expect(manager.isDirectiveInitialized(element, directiveName)).toBe(false)
+      expect(manager.getInitializedDirectives(element)).toEqual([])
+    })
+
+    it('should require directiveName for directive registration', () => {
       const teardown = vi.fn()
-      manager.registerComponent(element, teardown)
-      expect(manager.hasRegistration(element)).toBe(true)
-      
-      manager.clearComponentRegistration(element)
-      expect(manager.hasRegistration(element)).toBe(false)
-      expect(manager.getComponentTeardown(element)).toBeUndefined()
+      // @ts-expect-error Testing invalid input
+      expect(() => manager.registerDirective(element, teardown))
+        .toThrow('[HookTML] directiveName is required')
     })
 
-    it('should clear directive registrations', () => {
-      const teardown1 = vi.fn()
-      const teardown2 = vi.fn()
-      manager.registerDirective(element, teardown1, 'directive1')
-      manager.registerDirective(element, teardown2, 'directive2')
-      expect(manager.hasRegistration(element)).toBe(true)
-      
-      manager.clearDirectiveRegistrations(element)
-      expect(manager.hasRegistration(element)).toBe(false)
-      expect(manager.getDirectiveTeardowns(element)).toEqual([])
-    })
-
-    it('should clear all registrations for an element', () => {
-      const componentTeardown = vi.fn()
-      const directiveTeardown = vi.fn()
-      
-      manager.registerComponent(element, componentTeardown)
-      manager.registerDirective(element, directiveTeardown, 'directive1')
-      expect(manager.hasRegistration(element)).toBe(true)
-
-      manager.clearAllRegistrations(element)
-      expect(manager.hasRegistration(element)).toBe(false)
-      expect(manager.getComponentTeardown(element)).toBeUndefined()
-      expect(manager.getDirectiveTeardowns(element)).toEqual([])
-    })
-
-    it('should handle clearing non-existent registrations gracefully', () => {
-      expect(manager.hasRegistration(element)).toBe(false)
-      
-      // These should not throw errors
-      manager.clearComponentRegistration(element)
-      manager.clearDirectiveRegistrations(element)
-      manager.clearAllRegistrations(element)
-      
-      expect(manager.hasRegistration(element)).toBe(false)
+    it('should handle state checks for non-HTMLElement', () => {
+      // @ts-expect-error Testing invalid input
+      expect(manager.isInitialized(null)).toBe(false)
+      // @ts-expect-error Testing invalid input
+      expect(manager.isDirectiveInitialized(null, 'test')).toBe(false)
+      // @ts-expect-error Testing invalid input
+      expect(manager.getInitializedDirectives(null)).toEqual([])
     })
   })
 }) 

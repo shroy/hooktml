@@ -1,44 +1,43 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { init } from '../index.js'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { start } from '../index.js'
+import { logger } from '../utils/logger.js'
 
-describe('init', () => {
+/**
+ * Tests for HookTML initialization
+ */
+describe('HookTML Initialization', () => {
+  // @ts-ignore - Ignore the type checking for spyOn
+  const loggerSpy = vi.spyOn(logger, 'log')
+
   beforeEach(() => {
+    loggerSpy.mockClear()
     document.body.innerHTML = ''
-    vi.restoreAllMocks()
   })
 
-  it('should initialize components when called', () => {
-    document.body.innerHTML = `
-      <div class='TestComponent'>Test Content</div>
-      <div use-another-component>Another Component</div>
-    `
-
-    const initSpy = vi.spyOn(init, 'manualScan')
-    
-    init()
-    
-    expect(initSpy).toHaveBeenCalled()
+  afterEach(() => {
+    loggerSpy.mockRestore()
   })
 
-  it('should not throw when called multiple times', () => {
-    document.body.innerHTML = '<div class="TestComponent">Test</div>'
+  /**
+   * Test that initialization sets up DOM observation properly
+   */
+  it('should initialize and start DOM observation', async () => {
+    const runtime = await start()
     
-    expect(() => {
-      init()
-      init()
-      init()
-    }).not.toThrow()
+    expect(loggerSpy).toHaveBeenCalledWith('Initializing...')
+    expect(loggerSpy).toHaveBeenCalledWith('Initialization complete')
+    expect(runtime).toHaveProperty('config')
   })
 
-  it('should work with empty document', () => {
-    expect(() => init()).not.toThrow()
-  })
-
-  it('should be callable as a function', () => {
-    const initSpy = vi.spyOn(init, 'manualScan').mockImplementation(() => [])
+  it('should initialize with default configuration', async () => {
+    // Create a fresh spy for this test only
+    // @ts-ignore - Ignore the type checking for spyOn
+    const localLoggerSpy = vi.spyOn(logger, 'log')
     
-    init()
+    const runtime = await start()
     
-    expect(initSpy).toHaveBeenCalled()
+    expect(runtime.config.debug).toBe(false)
+    expect(runtime.config).toHaveProperty('componentPath')
+    expect(localLoggerSpy).toHaveBeenCalledWith('Initializing...')
   })
 }) 

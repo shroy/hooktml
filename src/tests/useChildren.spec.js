@@ -3,10 +3,12 @@ import { useChildren } from '../hooks/useChildren.js'
 
 describe('useChildren', () => {
   beforeEach(() => {
+    // Reset document body before each test
     document.body.innerHTML = ''
   })
 
   it('should map single elements correctly with both singular and plural keys', () => {
+    // Setup
     document.body.innerHTML = `
       <div id="toggle-root" use-toggle>
         <button toggle-button>Toggle</button>
@@ -19,14 +21,17 @@ describe('useChildren', () => {
     
     const result = useChildren(root, 'toggle')
     
+    // Verify we get both singular and plural keys
     expect(result).toHaveProperty('button')
     expect(result).toHaveProperty('buttons')
     expect(result).toHaveProperty('content')
     expect(result).toHaveProperty('contents')
     
+    // Verify singular keys point to the first (and only) element
     expect(result.button instanceof HTMLElement && result.button.textContent).toBe('Toggle')
     expect(result.content instanceof HTMLElement && result.content.textContent).toBe('Content')
     
+    // Verify plural keys are arrays containing the same element
     expect(Array.isArray(result.buttons)).toBe(true)
     expect(Array.isArray(result.contents)).toBe(true)
     expect(result.buttons.length).toBe(1)
@@ -36,6 +41,7 @@ describe('useChildren', () => {
   })
 
   it('should group multiple elements with both singular and plural keys', () => {
+    // Setup - two tabs with same attribute
     document.body.innerHTML = `
       <div id="tabs-root" use-tabs>
         <button tabs-tab>Tab 1</button>
@@ -50,31 +56,37 @@ describe('useChildren', () => {
     
     const result = useChildren(root, 'tabs')
     
+    // Verify we get both singular and plural keys
     expect(result).toHaveProperty('tab')
     expect(result).toHaveProperty('tabs')
     expect(result).toHaveProperty('panel')
     expect(result).toHaveProperty('panels')
     
+    // Verify singular keys point to first element
     expect(result.tab instanceof HTMLElement).toBe(true)
     expect(result.panel instanceof HTMLElement).toBe(true)
     expect(result.tab.textContent).toBe('Tab 1')
     expect(result.panel.textContent).toBe('Panel 1')
     
+    // Verify plural keys are arrays with correct length
     expect(Array.isArray(result.tabs)).toBe(true)
     expect(Array.isArray(result.panels)).toBe(true)
     expect(result.tabs.length).toBe(2)
     expect(result.panels.length).toBe(2)
     
+    // Verify array content
     expect(result.tabs[0].textContent).toBe('Tab 1')
     expect(result.tabs[1].textContent).toBe('Tab 2')
     expect(result.panels[0].textContent).toBe('Panel 1')
     expect(result.panels[1].textContent).toBe('Panel 2')
     
+    // Verify singular keys match first element in plural arrays
     expect(result.tab).toBe(result.tabs[0])
     expect(result.panel).toBe(result.panels[0])
   })
 
   it('should not select elements from nested hooks', () => {
+    // Setup - nested toggle structure
     document.body.innerHTML = `
       <div id="outer-toggle" use-toggle>
         <button toggle-button>Outer Toggle</button>
@@ -92,8 +104,10 @@ describe('useChildren', () => {
     
     if (!outerToggle || !innerToggle) throw new Error('Test elements not found')
     
+    // Get children for outer toggle
     const outerResult = useChildren(outerToggle, 'toggle')
     
+    // Verify outer toggle has both singular and plural keys
     expect(outerResult.button instanceof HTMLElement).toBe(true)
     expect(outerResult.content instanceof HTMLElement).toBe(true)
     expect(Array.isArray(outerResult.buttons)).toBe(true)
@@ -102,6 +116,7 @@ describe('useChildren', () => {
     const outerButton = outerResult.button
     const outerContent = outerResult.content
     
+    // Only proceed if they are HTMLElements
     if (!(outerButton instanceof HTMLElement) || !(outerContent instanceof HTMLElement)) {
       throw new Error('Expected HTMLElement but got something else')
     }
@@ -111,11 +126,13 @@ describe('useChildren', () => {
     
     // Ensure outer doesn't find inner toggle's button and content
     const allButtons = outerToggle.querySelectorAll('[toggle-button]')
-    expect(allButtons.length).toBe(2)
-    expect(Object.keys(outerResult)).toHaveLength(4)
+    expect(allButtons.length).toBe(2) // There are 2 in the document
+    expect(Object.keys(outerResult)).toHaveLength(4) // But only 4 keys (button, buttons, content, contents)
     
+    // Get children for inner toggle
     const innerResult = useChildren(innerToggle, 'toggle')
     
+    // Verify inner toggle finds its own children with both keys
     expect(innerResult.button instanceof HTMLElement).toBe(true)
     expect(innerResult.content instanceof HTMLElement).toBe(true)
     expect(Array.isArray(innerResult.buttons)).toBe(true)
@@ -124,6 +141,7 @@ describe('useChildren', () => {
     const innerButton = innerResult.button
     const innerContent = innerResult.content
     
+    // Only proceed if they are HTMLElements
     if (!(innerButton instanceof HTMLElement) || !(innerContent instanceof HTMLElement)) {
       throw new Error('Expected HTMLElement but got something else')
     }
@@ -133,6 +151,7 @@ describe('useChildren', () => {
   })
 
   it('should handle deeply nested structures', () => {
+    // Setup - multi-level nesting with components
     document.body.innerHTML = `
       <div id="root-menu" use-menu>
         <div menu-title>Root Menu</div>
@@ -159,20 +178,24 @@ describe('useChildren', () => {
       </div>
     `
     
+    // Get elements
     const rootMenu = document.getElementById('root-menu')
     const submenu1 = document.getElementById('submenu-1')
     const submenu11 = document.getElementById('submenu-1-1')
     
     if (!rootMenu || !submenu1 || !submenu11) throw new Error('Test elements not found')
     
+    // Get children for each level
     const rootChildren = useChildren(rootMenu, 'menu')
     const submenu1Children = useChildren(submenu1, 'menu')
     const submenu11Children = useChildren(submenu11, 'menu')
     
+    // Verify root menu has both singular and plural keys
     expect(rootChildren.title instanceof HTMLElement).toBe(true)
     expect(submenu1Children.title instanceof HTMLElement).toBe(true)
     expect(submenu11Children.title instanceof HTMLElement).toBe(true)
     
+    // Only proceed if they are HTMLElements
     if (!(rootChildren.title instanceof HTMLElement) || 
         !(submenu1Children.title instanceof HTMLElement) || 
         !(submenu11Children.title instanceof HTMLElement)) {
@@ -185,7 +208,7 @@ describe('useChildren', () => {
     
     // Count all menu-title elements in the document
     const allTitles = document.querySelectorAll('[menu-title]')
-    expect(allTitles.length).toBe(3)
+    expect(allTitles.length).toBe(3) // There are 3 in the document
     
     // But each level only gets its own - now 4 keys each (title, titles, items, itemsPlural)
     expect(Object.keys(rootChildren)).toHaveLength(4)
@@ -193,14 +216,13 @@ describe('useChildren', () => {
     expect(Object.keys(submenu11Children)).toHaveLength(4)
   })
 
-  it('should convert kebab-case attributes to camelCase keys', () => {
+  it('should handle kebab-case to camelCase conversion correctly', () => {
+    // Setup - element with kebab-case attributes
     document.body.innerHTML = `
       <div id="form-root" use-form>
         <input form-first-name value="John">
         <input form-last-name value="Doe">
-        <select form-user-role>
-          <option>admin</option>
-        </select>
+        <input form-email-address value="john@example.com">
       </div>
     `
     
@@ -209,41 +231,53 @@ describe('useChildren', () => {
     
     const result = useChildren(root, 'form')
     
+    // Verify kebab-case converted to camelCase correctly for both singular and plural
     expect(result).toHaveProperty('firstName')
     expect(result).toHaveProperty('firstNames')
     expect(result).toHaveProperty('lastName')
     expect(result).toHaveProperty('lastNames')
-    expect(result).toHaveProperty('userRole')
-    expect(result).toHaveProperty('userRoles')
+    expect(result).toHaveProperty('emailAddress')
+    expect(result).toHaveProperty('emailAddresses')
     
-    if (!(result.firstName instanceof HTMLElement) || !(result.lastName instanceof HTMLElement)) {
-      throw new Error('Expected HTMLElement but got something else')
+    // Verify singular values - check that they're input elements
+    expect(result.firstName instanceof HTMLInputElement).toBe(true)
+    expect(result.lastName instanceof HTMLInputElement).toBe(true)
+    expect(result.emailAddress instanceof HTMLInputElement).toBe(true)
+    
+    // Verify plural values are arrays
+    expect(Array.isArray(result.firstNames)).toBe(true)
+    expect(Array.isArray(result.lastNames)).toBe(true)
+    expect(Array.isArray(result.emailAddresses)).toBe(true)
+    
+    // Only proceed if they are HTMLInputElements
+    if (!(result.firstName instanceof HTMLInputElement) || 
+        !(result.lastName instanceof HTMLInputElement) || 
+        !(result.emailAddress instanceof HTMLInputElement)) {
+      throw new Error('Expected HTMLInputElement but got something else')
     }
     
     expect(result.firstName.value).toBe('John')
     expect(result.lastName.value).toBe('Doe')
+    expect(result.emailAddress.value).toBe('john@example.com')
     
-    expect(Array.isArray(result.firstNames)).toBe(true)
-    expect(Array.isArray(result.lastNames)).toBe(true)
-    expect(Array.isArray(result.userRoles)).toBe(true)
-    
-    expect(result.firstNames.length).toBe(1)
-    expect(result.lastNames.length).toBe(1)
-    expect(result.userRoles.length).toBe(1)
-    
-    // Both singular and plural should reference the same elements
+    // Verify consistency between singular and plural
     expect(result.firstName).toBe(result.firstNames[0])
     expect(result.lastName).toBe(result.lastNames[0])
-    expect(result.userRole).toBe(result.userRoles[0])
+    expect(result.emailAddress).toBe(result.emailAddresses[0])
   })
 
-  it('should handle invalid inputs gracefully', () => {
-    const validElement = document.createElement('div')
+  it('should throw an error with invalid arguments', () => {
+    // Setup
+    const div = document.createElement('div')
     
-    // @ts-expect-error Testing invalid input
-    expect(() => useChildren(null, 'test')).toThrow()
-    expect(() => useChildren(validElement, '')).toThrow()
-    expect(() => useChildren(validElement, null)).toThrow()
+    // Test with non-HTMLElement - using Function arguments to bypass type checking
+    expect(() => Function.prototype.apply.call(useChildren, null, [null, 'toggle'])).toThrow()
+    expect(() => Function.prototype.apply.call(useChildren, null, [{}, 'toggle'])).toThrow()
+    
+    // Test with invalid prefix
+    expect(() => Function.prototype.apply.call(useChildren, null, [div, null])).toThrow()
+    expect(() => useChildren(div, '')).toThrow()
+    expect(() => Function.prototype.apply.call(useChildren, null, [div, 123])).toThrow()
   })
 }) 
  

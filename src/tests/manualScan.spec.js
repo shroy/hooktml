@@ -1,65 +1,74 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { manualScan } from '../core/manualScan.js'
+import { HookTML } from '../index.js'
+import * as scanComponentsModule from '../core/scanComponents.js'
+import { logger } from '../utils/logger.js'
 
-describe('manualScan', () => {
+describe('HookTML.scan()', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     document.body.innerHTML = ''
   })
-
-  it('should scan and initialize components', () => {
-    document.body.innerHTML = `
-      <div class="TestComponent">Component content</div>
-      <div use-component="AnotherComponent">Another component</div>
-    `
-
-    const scanSpy = vi.fn().mockReturnValue([
-      { element: document.querySelector('.TestComponent'), componentName: 'TestComponent' }
-    ])
-    const initializeSpy = vi.fn().mockReturnValue([
-      { element: document.querySelector('.TestComponent'), componentName: 'TestComponent', instance: {} }
-    ])
-
-    vi.mock('../core/scanComponents', () => ({
-      scanComponents: scanSpy,
-      initializeComponents: initializeSpy
-    }))
-
-    const result = manualScan()
-
-    expect(scanSpy).toHaveBeenCalled()
-    expect(initializeSpy).toHaveBeenCalled()
-    expect(result).toEqual(expect.any(Array))
+  
+  it('should call scanComponents and initializeComponents', () => {
+    // Setup
+    const mockFoundComponents = [{ element: document.createElement('div'), componentName: 'Test' }]
+    const mockInitializedComponents = [{ element: document.createElement('div'), componentName: 'Test', instance: {} }]
+    
+    // Mock the required functions
+    const scanSpy = vi.spyOn(scanComponentsModule, 'scanComponents')
+      .mockReturnValue(mockFoundComponents)
+    
+    const initializeSpy = vi.spyOn(scanComponentsModule, 'initializeComponents')
+      .mockReturnValue(mockInitializedComponents)
+    
+    // Execute
+    const result = HookTML.scan()
+    
+    // Verify
+    expect(scanSpy).toHaveBeenCalledTimes(1)
+    expect(initializeSpy).toHaveBeenCalledTimes(1)
+    expect(initializeSpy).toHaveBeenCalledWith(mockFoundComponents)
+    expect(result).toBe(mockInitializedComponents)
   })
-
-  it('should work with empty document', () => {
-    const scanSpy = vi.fn().mockReturnValue([])
-    const initializeSpy = vi.fn().mockReturnValue([])
-
-    vi.mock('../core/scanComponents', () => ({
-      scanComponents: scanSpy,
-      initializeComponents: initializeSpy
-    }))
-
-    const result = manualScan()
-
-    expect(scanSpy).toHaveBeenCalled()
-    expect(initializeSpy).toHaveBeenCalledWith([])
-    expect(result).toEqual([])
+  
+  it('should pass found components to initializeComponents', () => {
+    // Setup
+    const mockFoundComponents = [
+      { element: document.createElement('div'), componentName: 'Component1' },
+      { element: document.createElement('div'), componentName: 'Component2' }
+    ]
+    
+    // Mock the required functions
+    vi.spyOn(scanComponentsModule, 'scanComponents')
+      .mockReturnValue(mockFoundComponents)
+    
+    const initializeSpy = vi.spyOn(scanComponentsModule, 'initializeComponents')
+      .mockReturnValue([])
+    
+    // Execute
+    HookTML.scan()
+    
+    // Verify correct parameters passed
+    expect(initializeSpy).toHaveBeenCalledWith(mockFoundComponents)
   })
-
-  it('should return an array', () => {
-    const result = manualScan()
-    expect(Array.isArray(result)).toBe(true)
-  })
-
-  it('should work with selectors', () => {
-    document.body.innerHTML = `
-      <div class="TestComponent">Component 1</div>
-      <div class="AnotherComponent">Component 2</div>
-    `
-
-    const result = manualScan('.TestComponent')
-    expect(Array.isArray(result)).toBe(true)
+  
+  it('should log scan results', () => {
+    // Setup
+    // @ts-ignore - Ignore the type checking for spyOn
+    const loggerSpy = vi.spyOn(logger, 'log')
+    
+    // Mock functions
+    vi.spyOn(scanComponentsModule, 'scanComponents')
+      .mockReturnValue([{ element: document.createElement('div'), componentName: 'Test' }])
+    
+    vi.spyOn(scanComponentsModule, 'initializeComponents')
+      .mockReturnValue([{ element: document.createElement('div'), componentName: 'Test', instance: {} }])
+    
+    // Execute
+    HookTML.scan()
+    
+    // Verify logging
+    expect(loggerSpy).toHaveBeenCalledWith('Manual scan triggered')
+    expect(loggerSpy).toHaveBeenCalledWith('Manual scan complete, initialized 1 new component(s)')
   })
 }) 

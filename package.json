@@ -4,6 +4,11 @@
   "description": "A reactive HTML component library with hooks-based lifecycle management",
   "main": "index.js",
   "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
   "keywords": [
     "html",
     "components",
@@ -12,19 +17,22 @@
     "dom",
     "frontend"
   ],
-  "author": "Your Name <your.email@example.com>",
+  "author": "Josh Shroy",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/hooktml.git"
+    "url": "https://github.com/shroy/hooktml.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/hooktml/issues"
+    "url": "https://github.com/shroy/hooktml/issues"
   },
-  "homepage": "https://github.com/yourusername/hooktml#readme",
+  "homepage": "https://github.com/shroy/hooktml#readme",
   "files": [
     "index.js",
-    "src/",
+    "src/core/",
+    "src/hooks/",
+    "src/utils/",
+    "src/index.js",
     "README.md"
   ],
   "scripts": {
@@ -42,6 +50,9 @@
     "vitest": "^1.3.1"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

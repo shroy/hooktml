@@ -3,36 +3,58 @@ import { initializeComponents } from '../core/scanComponents'
 import * as registryModule from '../core/registry'
 import * as initializationModule from '../core/initialization'
 
+/**
+ * Tests for component initialization tracking
+ */
 describe('Component Initialization Tracking', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     document.body.innerHTML = ''
   })
   
+  /**
+   * Test skipping already initialized elements
+   */
   it('should skip elements that have already been initialized', () => {
+    // Setup
     const element = document.createElement('div')
     const componentFn = vi.fn().mockReturnValue({ initialized: true })
     
+    // Mock the registry and mark element as initialized
     vi.spyOn(registryModule, 'getRegisteredComponent').mockReturnValue(componentFn)
+    // Mark the element as initialized using the lifecycleManager
     initializationModule.lifecycleManager.markInitialized(element)
     
+    // Create scan results
     const scanResults = [{ element, componentName: 'TestComponent' }]
+    
+    // Execute
     const result = initializeComponents(scanResults)
     
+    // Verify
     expect(componentFn).not.toHaveBeenCalled()
     expect(result).toHaveLength(0)
   })
   
+  /**
+   * Test marking elements as initialized
+   */
   it('should mark elements as initialized after successful initialization', () => {
+    // Setup
     const element = document.createElement('div')
     const componentFn = vi.fn().mockReturnValue({ initialized: true })
     
+    // Mock the registry
     vi.spyOn(registryModule, 'getRegisteredComponent').mockReturnValue(componentFn)
     const markInitializedSpy = vi.spyOn(initializationModule, 'markInitialized')
     
+    // Create scan results
     const scanResults = [{ element, componentName: 'TestComponent' }]
+    
+    // Execute
     const result = initializeComponents(scanResults)
     
+    // Verify
     expect(componentFn).toHaveBeenCalledWith(element, expect.any(Object))
     expect(markInitializedSpy).toHaveBeenCalledWith(element)
     expect(result).toHaveLength(1)
