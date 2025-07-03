@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8b3ccaf6-31fe-4ae3-9b1c-52752f86752c" width="500" alt="HookTML logo" />
+  <img src="https://raw.githubusercontent.com/shroy/hooktml/main/assets/logo.png" width="500" alt="HookTML logo" />
 </p>
 
 **HTML-first behavior with functional hooks: declarative, composable, and lightweight.**
