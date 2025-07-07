@@ -5,7 +5,11 @@
   "main": "index.js",
   "type": "module",
   "exports": {
-    ".": "./index.js",
+    ".": {
+      "browser": "./index.browser.js",
+      "node": "./index.js",
+      "default": "./index.js"
+    },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
@@ -29,19 +33,22 @@
   "homepage": "https://github.com/shroy/hooktml#readme",
   "files": [
     "index.js",
+    "index.browser.js",
     "src/core/",
     "src/hooks/",
     "src/utils/",
     "src/index.js",
+    "dist/",
     "README.md"
   ],
   "scripts": {
+    "build": "esbuild index.browser.js --bundle --format=iife --global-name=HookTML --outfile=dist/hooktml.min.js --minify",
+    "build:dev": "esbuild index.browser.js --bundle --format=iife --global-name=HookTML --outfile=dist/hooktml.js",
     "test": "vitest",
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "build": "echo 'No build step required for ES modules'",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm run build && npm test"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^1.3.1",

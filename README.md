@@ -86,6 +86,44 @@ You can use HookTML directly in the browser via `<script type="module">` or inst
 </script>
 ```
 
+### Using via Script Tag
+
+For projects that don't use ES modules, you can include HookTML as a global script:
+
+```html
+<script src="https://unpkg.com/hooktml@latest/dist/hooktml.min.js"></script>
+<script>
+  // HookTML is now available globally
+  HookTML.start();
+</script>
+```
+
+You can also download and host the file locally:
+
+```html
+<script src="./js/hooktml.min.js"></script>
+<script>
+  // Register a custom component
+  function MyCounter(el, props) {
+    const { increment, display } = props.children;
+    const count = HookTML.signal(0);
+    
+    HookTML.useEffect(() => {
+      display.textContent = count.value;
+    }, [count]);
+    
+    HookTML.useEvents(increment, {
+      click: () => count.value = count.value + 1
+    });
+  }
+  
+  HookTML.registerComponent(MyCounter);
+  
+  // Start the runtime
+  HookTML.start();
+</script>
+```
+
 ### Using npm/yarn
 
 ```bash

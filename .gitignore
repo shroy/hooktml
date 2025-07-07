@@ -7,6 +7,9 @@ node_modules/
 # Coverage reports
 coverage/
 
+# Build output
+dist/
+
 # OS generated files
 .DS_Store
 
