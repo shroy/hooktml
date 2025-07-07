@@ -1,6 +1,6 @@
 {
   "name": "hooktml",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A reactive HTML component library with hooks-based lifecycle management",
   "main": "index.js",
   "type": "module",
