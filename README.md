@@ -34,6 +34,8 @@ HookTML is a JavaScript library that lets you add interactive behavior to HTML w
 ```
 
 ```js
+import { signal, useEffect, useEvents } from 'hooktml';
+
 export const Counter = (el, props) => {
   const { increment, display } = props.children;
   const count = signal(0);
@@ -81,7 +83,7 @@ You can use HookTML directly in the browser via `<script type="module">` or inst
 
 ```html
 <script type="module">
-  import { HookTML } from 'https://unpkg.com/hooktml';
+  import HookTML from 'https://unpkg.com/hooktml';
   HookTML.start();
 </script>
 ```
@@ -103,24 +105,27 @@ You can also download and host the file locally:
 ```html
 <script src="./js/hooktml.min.js"></script>
 <script>
+  // Destructure what you need from HookTML
+  const { start, signal, useEffect, registerComponent, useEvents } = HookTML;
+  
   // Register a custom component
   function MyCounter(el, props) {
     const { increment, display } = props.children;
-    const count = HookTML.signal(0);
+    const count = signal(0);
     
-    HookTML.useEffect(() => {
+    useEffect(() => {
       display.textContent = count.value;
     }, [count]);
     
-    HookTML.useEvents(increment, {
+    useEvents(increment, {
       click: () => count.value = count.value + 1
     });
   }
   
-  HookTML.registerComponent(MyCounter);
+  registerComponent(MyCounter);
   
   // Start the runtime
-  HookTML.start();
+  start();
 </script>
 ```
 
@@ -133,7 +138,7 @@ yarn add hooktml
 ```
 
 ```js
-import { HookTML } from 'hooktml';
+import HookTML from 'hooktml';
 HookTML.start();
 ```
 
@@ -677,7 +682,7 @@ The `data-hooktml-cloak` attribute is removed automatically once behavior is rea
 
 | Function | Description |
 |----------|-------------|
-| `HookTML.start(options)` | Initialize the library with optional configuration |
+| `start(options)` | Initialize the library with optional configuration |
 | `registerComponent(Component)` | Register a component function |
 | `registerHook(useHook)` | Register a hook function |
 | `registerChainableHook(useHook)` | Register a hook for use with the `with()` chainable API |
@@ -1133,9 +1138,22 @@ HookTML scans the DOM when started and observes mutations to initialize new elem
 
 ```js
 // On page load
-HookTML.start();
+import { start } from 'hooktml';
+start();
 
 // No need to reinitialize after DOM updates!
+```
+
+**With script tag:**
+```html
+<script src="https://unpkg.com/hooktml@latest/dist/hooktml.min.js"></script>
+<script>
+  // On page load
+  const { start } = HookTML;
+  start();
+
+  // No need to reinitialize after DOM updates!
+</script>
 ```
 
 ### Working with Server Frameworks

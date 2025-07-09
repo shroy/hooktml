@@ -34,6 +34,7 @@
   "files": [
     "index.js",
     "index.browser.js",
+    "index.global.js",
     "src/core/",
     "src/hooks/",
     "src/utils/",
@@ -42,8 +43,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "esbuild index.browser.js --bundle --format=iife --global-name=HookTML --outfile=dist/hooktml.min.js --minify",
-    "build:dev": "esbuild index.browser.js --bundle --format=iife --global-name=HookTML --outfile=dist/hooktml.js",
+    "build": "esbuild index.global.js --bundle --format=iife --outfile=dist/hooktml.min.js --minify",
+    "build:dev": "esbuild index.global.js --bundle --format=iife --outfile=dist/hooktml.js",
     "test": "vitest",
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",

@@ -1,8 +1,8 @@
 import {
-  registerHook, 
-  registerChainableHook, 
-  getRegisteredHooks, 
-  getRegisteredChainableHooks 
+  registerHook,
+  registerChainableHook,
+  getRegisteredHooks,
+  getRegisteredChainableHooks
 } from './core/hookRegistry.js'
 import { useEffect } from './core/hookContext.js'
 import { useChildren } from './hooks/useChildren.js'
@@ -44,7 +44,7 @@ const observerRef = {
 export const start = async (options) => {
   // Configure
   initConfig(options)
-  
+
   logger.log('Initializing...')
 
   // Log the resolved configuration
@@ -52,7 +52,7 @@ export const start = async (options) => {
   if (attributePrefix) {
     logger.log(`Using attribute prefix: "${attributePrefix}"`)
   }
-  
+
   // Auto-register components if path is provided
   if (componentPath) {
     logger.log(`Auto-registering components from: "${componentPath}"`)
@@ -62,17 +62,17 @@ export const start = async (options) => {
       debug
     })
   }
-  
+
   // Create and start the observer
   observerRef.current = createObserver()
   observerRef.current.start()
-  
+
   // Initial scan
   scan()
-  
+
   // Log completion message
   logger.log('Initialization complete')
-  
+
   // Return API for runtime management
   return {
     config: getConfig(),
@@ -93,20 +93,20 @@ export const scan = () => {
   logger.log('Manual scan triggered')
   const components = scanComponents()
   const instances = initializeComponents(components)
-  
+
   // Scan for directives
   scanDirectives()
-  
+
   logger.log(`Manual scan complete, initialized ${instances.length} new component(s)`)
   return instances
 }
 
 // Export core API
-export { 
-  registerComponent, 
+export {
+  registerComponent,
   registerHook,
   registerChainableHook,
-  useEffect, 
+  useEffect,
   useChildren,
   useEvents,
   useClasses,
@@ -117,21 +117,6 @@ export {
   computed
 }
 
-export const HookTML = {
-  start,
-  scan,
-  registerComponent,
-  registerHook,
-  registerChainableHook,
-  useEffect,
-  useChildren,
-  useEvents,
-  useClasses,
-  useAttributes,
-  useStyles,
-  with: withEl,
-  signal,
-  computed
-}
+
 
 export { getConfig } 

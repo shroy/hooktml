@@ -1,8 +1,8 @@
 import {
-  registerHook, 
-  registerChainableHook, 
-  getRegisteredHooks, 
-  getRegisteredChainableHooks 
+  registerHook,
+  registerChainableHook,
+  getRegisteredHooks,
+  getRegisteredChainableHooks
 } from './src/core/hookRegistry.js'
 import { useEffect } from './src/core/hookContext.js'
 import { useChildren } from './src/hooks/useChildren.js'
@@ -33,10 +33,10 @@ const observerRef = {
  * @param {import('./src/core/config.js').HookTMLConfigOptions} [options] - Configuration options
  * @returns {Object} - Runtime object with API methods
  */
-export const start = (options) => {
+const start = (options) => {
   // Configure (browser version ignores componentPath)
   initConfig(options)
-  
+
   logger.log('Initializing...')
 
   // Log the resolved configuration
@@ -44,17 +44,17 @@ export const start = (options) => {
   if (attributePrefix) {
     logger.log(`Using attribute prefix: "${attributePrefix}"`)
   }
-  
+
   // Create and start the observer
   observerRef.current = createObserver()
   observerRef.current.start()
-  
+
   // Initial scan
   scan()
-  
+
   // Log completion message
   logger.log('Initialization complete')
-  
+
   // Return API for runtime management
   return {
     config: getConfig(),
@@ -70,36 +70,21 @@ export const start = (options) => {
  * Scans the DOM for new components and hooks and initializes them
  * @returns {Array<Object>} Initialized component instances
  */
-export const scan = () => {
+const scan = () => {
   // Scan for components
   logger.log('Manual scan triggered')
   const components = scanComponents()
   const instances = initializeComponents(components)
-  
+
   // Scan for directives
   scanDirectives()
-  
+
   logger.log(`Manual scan complete, initialized ${instances.length} new component(s)`)
   return instances
 }
 
-// Export core API
-export { 
-  registerComponent, 
-  registerHook,
-  registerChainableHook,
-  useEffect, 
-  useChildren,
-  useEvents,
-  useClasses,
-  useAttributes,
-  useStyles,
-  withEl as with,
-  signal,
-  computed
-}
-
-export const HookTML = {
+// Export all functions as named exports
+export {
   start,
   scan,
   registerComponent,
@@ -111,9 +96,8 @@ export const HookTML = {
   useClasses,
   useAttributes,
   useStyles,
-  with: withEl,
+  withEl as with,
   signal,
-  computed
+  computed,
+  getConfig
 }
-
-export { getConfig } 
