@@ -133,6 +133,13 @@ export const isEventTarget = value => {
 }
 
 /**
+ * Check if a value is an array of valid event targets
+ * @param {unknown} value
+ * @returns {value is EventTarget[]} Whether or not the value is an array of valid event targets
+ */
+export const isEventTargetArray = value => isNonEmptyArray(value) && value.every(isEventTarget)
+
+/**
  * Check if a value is an object
  * @param {unknown} value
  * @returns {value is Record<string, unknown>} Whether or not the value is an object

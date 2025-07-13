@@ -145,6 +145,39 @@ describe('useEvents', () => {
     windowRemoveSpy.mockRestore()
   })
 
+  it('should work with arrays of elements', () => {
+    const button1 = document.createElement('button')
+    const button2 = document.createElement('button')
+    const button3 = document.createElement('button')
+    const buttons = [button1, button2, button3]
+
+    const clickHandler = vi.fn()
+    const mouseoverHandler = vi.fn()
+
+    const addEventSpies = buttons.map(btn => vi.spyOn(btn, 'addEventListener'))
+    const removeEventSpies = buttons.map(btn => vi.spyOn(btn, 'removeEventListener'))
+
+    const cleanup = useEvents(buttons, {
+      click: clickHandler,
+      mouseover: mouseoverHandler
+    })
+
+    buttons.forEach((btn, index) => {
+      expect(addEventSpies[index]).toHaveBeenCalledWith('click', clickHandler)
+      expect(addEventSpies[index]).toHaveBeenCalledWith('mouseover', mouseoverHandler)
+    })
+
+    cleanup()
+
+    buttons.forEach((btn, index) => {
+      expect(removeEventSpies[index]).toHaveBeenCalledWith('click', clickHandler)
+      expect(removeEventSpies[index]).toHaveBeenCalledWith('mouseover', mouseoverHandler)
+    })
+
+    addEventSpies.forEach(spy => spy.mockRestore())
+    removeEventSpies.forEach(spy => spy.mockRestore())
+  })
+
   it('should throw an error if eventMap is not a non-empty object', () => {
     expect(() => useEvents(element, null)).toThrow()
     expect(() => useEvents(element, {})).toThrow()
