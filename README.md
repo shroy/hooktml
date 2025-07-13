@@ -24,7 +24,7 @@ HookTML is a JavaScript library that lets you add interactive behavior to HTML w
 See HookTML in action with these interactive examples:
 
 - **[Currency Converter](https://codepen.io/shroy/pen/bNVbjVP)** - Real-time reactive updates with signals
-- **[Todo App](https://codepen.io/...)** - Component communication and state management  
+- **[Todo App](https://codepen.io/shroy/pen/VYvZBmB)** - Component communication and state management  
 - **[Modal Dialog](https://codepen.io/...)** - Advanced patterns with lifecycle hooks
 - **[Tabs Component](https://codepen.io/...)** - Child element coordination
 
