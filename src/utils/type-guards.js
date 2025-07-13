@@ -114,10 +114,23 @@ export const isHTMLElement = value => value instanceof HTMLElement
  * @param {unknown} value
  * @returns {value is EventTarget} Whether or not the value is a valid event target
  */
-export const isEventTarget = value =>
-  value instanceof HTMLElement ||
-  value instanceof Document ||
-  value instanceof Window
+export const isEventTarget = value => {
+  if (!value || typeof value !== 'object') return false
+
+  if (value instanceof HTMLElement) return true
+
+  if (value === document ||
+    ('nodeType' in value && value.nodeType === 9 && 'addEventListener' in value && isFunction(value.addEventListener))) {
+    return true
+  }
+
+  if (value === window ||
+    ('window' in value && value.window === value && 'addEventListener' in value && isFunction(value.addEventListener))) {
+    return true
+  }
+
+  return false
+}
 
 /**
  * Check if a value is an object
