@@ -1,13 +1,20 @@
 /**
  * Hook for conditionally applying CSS classes to an element
- * @param {HTMLElement} element - The element to apply classes to
+ * @param {HTMLElement|null|undefined} element - The element to apply classes to (or null/undefined)
  * @param {Record<string, boolean|{value: boolean, subscribe: Function}>} classMap - Object mapping class names to boolean conditions or signals
  * @returns {Function} Cleanup function that removes all event listeners
  */
-import { isHTMLElement, isNonEmptyArray, isNonEmptyObject, isSignal } from '../utils/type-guards.js'
+import { isHTMLElement, isNonEmptyArray, isNonEmptyObject, isSignal, isNil } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
+import { logger } from '../utils/logger.js'
 
 export const useClasses = (element, classMap) => {
+
+  if (isNil(element)) {
+    logger.warn('[HookTML] useClasses called with null/undefined element, skipping class application')
+    return () => { } // Return no-op cleanup function
+  }
+
   if (!isHTMLElement(element)) {
     throw new Error('[HookTML] useClasses requires an HTMLElement as first argument')
   }
@@ -34,7 +41,7 @@ export const useClasses = (element, classMap) => {
     Object.entries(classMap).forEach(([className, condition]) => {
       // Handle both boolean and signal values
       const isActive = isSignal(condition)
-        ? condition.value 
+        ? condition.value
         : Boolean(condition)
 
       if (isActive) {

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useStyles } from '../hooks/useStyles.js'
 
 describe('useStyles', () => {
@@ -57,8 +57,26 @@ describe('useStyles', () => {
     expect(element.style.padding).toBe('')
   })
 
+  it('should gracefully handle null/undefined elements with warning', () => {
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+
+    const cleanupNull = useStyles(null, { color: 'red' })
+
+    const cleanupUndefined = useStyles(undefined, { color: 'red' })
+
+    expect(consoleSpy).toHaveBeenCalledTimes(2)
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('useStyles called with null/undefined element'))
+
+    expect(typeof cleanupNull).toBe('function')
+    expect(typeof cleanupUndefined).toBe('function')
+
+    expect(() => cleanupNull()).not.toThrow()
+    expect(() => cleanupUndefined()).not.toThrow()
+
+    consoleSpy.mockRestore()
+  })
+
   it('should throw an error if first argument is not an HTMLElement', () => {
-    expect(() => useStyles(null, {})).toThrow()
     expect(() => useStyles({}, {})).toThrow()
     expect(() => useStyles('div', {})).toThrow()
   })

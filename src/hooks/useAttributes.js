@@ -1,11 +1,11 @@
-import { 
+import {
   isFunction,
-  isHTMLElement, 
-  isNil, 
-  isNonEmptyArray, 
-  isNonEmptyObject, 
-  isNotNil, 
-  isSignal 
+  isHTMLElement,
+  isNil,
+  isNonEmptyArray,
+  isNonEmptyObject,
+  isNotNil,
+  isSignal
 } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { tryCatch } from '../utils/try-catch.js'
@@ -13,11 +13,17 @@ import { logger } from '../utils/logger.js'
 
 /**
  * Hook for setting HTML attributes on an element
- * @param {HTMLElement} element - The element to set attributes on
+ * @param {HTMLElement|null|undefined} element - The element to set attributes on (or null/undefined)
  * @param {Record<string, string|null|{value: string|null, subscribe: Function}>} attrMap - Object mapping attribute names to string values, null to remove, or signals
  * @returns {Function} Cleanup function that removes all applied attributes
  */
 export const useAttributes = (element, attrMap) => {
+  // Handle null/undefined elements gracefully
+  if (isNil(element)) {
+    logger.warn('[HookTML] useAttributes called with null/undefined element, skipping attribute application')
+    return () => { } // Return no-op cleanup function
+  }
+
   if (!isHTMLElement(element)) {
     throw new Error('[HookTML] useAttributes requires an HTMLElement as first argument')
   }
@@ -37,8 +43,8 @@ export const useAttributes = (element, attrMap) => {
     Object.entries(attrMap).forEach(([attrName, valueOrSignal]) => {
       // Store original value for potential cleanup if not already stored
       if (!modifiedAttributes.has(attrName)) {
-        modifiedAttributes.set(attrName, element.hasAttribute(attrName) 
-          ? element.getAttribute(attrName) 
+        modifiedAttributes.set(attrName, element.hasAttribute(attrName)
+          ? element.getAttribute(attrName)
           : null
         )
       }
@@ -77,7 +83,7 @@ export const useAttributes = (element, attrMap) => {
         const unsubscribes = signalDeps.map(signal => {
           return isSignal(signal) ? signal.subscribe(() => applyAttributes()) : null
         }).filter(isNotNil)
-      
+
         // Add cleanup for manual subscriptions to modifiedAttributes for proper teardown
         const originalCleanup = modifiedAttributes.get('__cleanup')
         modifiedAttributes.set('__cleanup', () => {
@@ -93,11 +99,11 @@ export const useAttributes = (element, attrMap) => {
     // Run any stored cleanup function first
     const cleanup = modifiedAttributes.get('__cleanup')
     if (isFunction(cleanup)) cleanup()
-    
+
     // Restore original attribute values
     modifiedAttributes.forEach((originalValue, attrName) => {
       if (attrName === '__cleanup') return
-      
+
       if (isNil(originalValue)) {
         element.removeAttribute(attrName)
       } else {

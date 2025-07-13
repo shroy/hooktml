@@ -1,16 +1,22 @@
 /**
  * Hook for applying inline styles to an element
- * @param {HTMLElement} element - The element to apply styles to
+ * @param {HTMLElement|null|undefined} element - The element to apply styles to (or null/undefined)
  * @param {Partial<CSSStyleDeclaration>|Record<string, string|{value: string, subscribe: Function}>} styleMap - Object mapping style properties to values or signals
  * @returns {Function} Cleanup function that removes all applied styles
  */
 import { kebabToCamel } from '../utils/strings.js'
-import { isFunction, isHTMLElement, isNonEmptyArray, isNonEmptyObject, isSignal } from '../utils/type-guards.js'
+import { isFunction, isHTMLElement, isNonEmptyArray, isNonEmptyObject, isSignal, isNil } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { tryCatch } from '../utils/try-catch.js'
 import { logger } from '../utils/logger.js'
 
 export const useStyles = (element, styleMap) => {
+
+  if (isNil(element)) {
+    logger.warn('[HookTML] useStyles called with null/undefined element, skipping style application')
+    return () => { } // Return no-op cleanup function
+  }
+
   if (!isHTMLElement(element)) {
     throw new Error('[HookTML] useStyles requires an HTMLElement as first argument')
   }
@@ -29,7 +35,7 @@ export const useStyles = (element, styleMap) => {
   const applyStyles = () => {
     Object.entries(styleMap).forEach(([prop, valueOrSignal]) => {
       // Convert kebab-case to camelCase if needed
-      const cssProp = prop.includes('-') 
+      const cssProp = prop.includes('-')
         ? kebabToCamel(prop)
         : prop
 
@@ -66,7 +72,7 @@ export const useStyles = (element, styleMap) => {
         // Set up manual signal subscriptions as fallback
         // Since we've already filtered with isSignal, we know these have a subscribe method
         const unsubscribes = signalDeps.map(signal => signal.subscribe(() => applyStyles()))
-        
+
         // Add cleanup for manual subscriptions to modifiedStyles for proper teardown
         const originalCleanup = modifiedStyles.get('__cleanup')
         modifiedStyles.set('__cleanup', () => {
@@ -82,7 +88,7 @@ export const useStyles = (element, styleMap) => {
     // Run any stored cleanup function first
     const cleanup = modifiedStyles.get('__cleanup')
     if (isFunction(cleanup)) cleanup()
-    
+
     // Restore original style values
     modifiedStyles.forEach((originalValue, prop) => {
       if (prop === '__cleanup') return
