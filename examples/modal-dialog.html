@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/hooktml@latest/dist/hooktml.min.js"></script>
+  <title>Modal Dialog - HookTML Example</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      background: #f8fafc;
+    }
+
+    .demo-section {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      color: #1f2937;
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      color: #374151;
+      margin-bottom: 1rem;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #4b5563;
+      transform: translateY(-1px);
+    }
+
+    /* Dialog Styling */
+    dialog {
+      border: none;
+      border-radius: 12px;
+      padding: 0;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      max-width: 500px;
+      width: 90vw;
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    [modal-header] {
+      padding: 1.5rem 2rem 1rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    [modal-title] {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1f2937;
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #6b7280;
+      padding: 0.25rem;
+      border-radius: 4px;
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close:hover {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    [modal-body] {
+      padding: 1.5rem 2rem;
+    }
+
+    [modal-footer] {
+      padding: 1rem 2rem 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .demo-info {
+      background: #e7f3ff;
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 4px solid #3b82f6;
+      margin-top: 1rem;
+    }
+
+    .demo-info p {
+      margin: 0;
+      color: #1e40af;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🪟 Modal Dialog Example</h1>
+
+  <div class="demo-section">
+    <h2>Interactive Modal Dialogs</h2>
+    <p>Click the buttons below to open different types of modal dialogs enhanced with HookTML:</p>
+
+    <div class="button-group">
+      <button class="btn-primary" use-modal-trigger="info-modal">ℹ️ Info Dialog</button>
+      <button class="btn-success" use-modal-trigger="contact-modal">📧 Contact Form</button>
+      <button class="btn-danger" use-modal-trigger="confirm-modal">⚠️ Confirm Action</button>
+    </div>
+
+    <div class="demo-info">
+      <p><strong>Features:</strong> Native HTML5 dialog element enhanced with HookTML. Uses
+        <code>use-modal-trigger</code> hook for declarative triggers and <code>modal-modal-id</code> component props for
+        identification. Includes backdrop click closing, escape key handling, focus management, and automatic cleanup.
+      </p>
+    </div>
+  </div>
+
+  <!-- Info Modal -->
+  <dialog class="Modal" modal-modal-id="info-modal">
+    <div modal-header>
+      <h3 modal-title>About HookTML</h3>
+      <button modal-close class="modal-close">×</button>
+    </div>
+    <div modal-body>
+      <p><strong>HookTML</strong> is a JavaScript library that lets you add interactive behavior to HTML without
+        sacrificing control over your markup.</p>
+      <p>Key features include:</p>
+      <ul>
+        <li>HTML-first development approach</li>
+        <li>Functional composition with hooks</li>
+        <li>Reactive signals for state management</li>
+        <li>Automatic cleanup and lifecycle management</li>
+        <li>Progressive enhancement friendly</li>
+      </ul>
+    </div>
+    <div modal-footer>
+      <button modal-close class="btn-secondary">Close</button>
+      <button class="btn-primary">Learn More</button>
+    </div>
+  </dialog>
+
+  <!-- Contact Form Modal -->
+  <dialog class="Modal" modal-modal-id="contact-modal">
+    <div modal-header>
+      <h3 modal-title>Contact Us</h3>
+      <button modal-close class="modal-close">×</button>
+    </div>
+    <div modal-body>
+      <form modal-form>
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required>
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label for="subject">Subject</label>
+          <select id="subject" name="subject">
+            <option value="general">General Inquiry</option>
+            <option value="support">Support</option>
+            <option value="feedback">Feedback</option>
+            <option value="bug">Bug Report</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" placeholder="How can we help you?" required></textarea>
+        </div>
+      </form>
+    </div>
+    <div modal-footer>
+      <button modal-close class="btn-secondary">Cancel</button>
+      <button modal-submit class="btn-success">Send Message</button>
+    </div>
+  </dialog>
+
+  <!-- Confirmation Modal -->
+  <dialog class="Modal" modal-modal-id="confirm-modal">
+    <div modal-header>
+      <h3 modal-title>Confirm Action</h3>
+      <button modal-close class="modal-close">×</button>
+    </div>
+    <div modal-body>
+      <p>Are you sure you want to delete this item? This action cannot be undone.</p>
+      <p><strong>Warning:</strong> All associated data will be permanently removed from the system.</p>
+    </div>
+    <div modal-footer>
+      <button modal-close class="btn-secondary">Cancel</button>
+      <button modal-confirm class="btn-danger">Delete Item</button>
+    </div>
+  </dialog>
+
+  <script>
+    // Destructure HookTML functions
+    const { signal, useEffect, useEvents, registerComponent, registerHook, start } = HookTML;
+
+    // Store modal registry for communication between triggers and modals
+    const modalRegistry = new Map();
+
+    // Modal Trigger Hook
+    const useModalTrigger = (el, props) => {
+      const modalId = props.value; // The modal ID to trigger
+
+      useEvents(el, {
+        click: () => {
+          const modal = modalRegistry.get(modalId);
+          if (modal) {
+            modal.open();
+          }
+        }
+      });
+    };
+
+    // Modal Dialog Component
+    const Modal = (el, props) => {
+
+      const { closes, submit, confirm, form, header, body, footer, title } = props.children;
+      const modalId = props.modalId; // Now using proper HookTML props
+
+      // State
+      const isOpen = signal(false);
+
+      // Open modal function
+      const openModal = () => {
+        el.showModal();
+        isOpen.value = true;
+
+        // Focus management - focus first focusable element
+        const focusable = el.querySelector('input, button, textarea, select');
+        if (focusable) {
+          setTimeout(() => focusable.focus(), 100);
+        }
+      };
+
+      // Close modal function  
+      const closeModal = () => {
+        // Clear form data if there's a form
+        if (form) {
+          form.reset();
+        }
+        el.close();
+        isOpen.value = false;
+      };
+
+      // Register this modal in the global registry
+      if (modalId) {
+        modalRegistry.set(modalId, {
+          open: openModal,
+          close: closeModal,
+          element: el
+        });
+      }
+
+      // Handle close buttons (multiple possible)
+      if (closes && closes.length) {
+        closes.forEach(button => {
+          useEvents(button, {
+            click: (e) => {
+              e.preventDefault();
+              closeModal();
+            }
+          });
+        });
+      }
+
+      // Handle form submission
+      if (submit) {
+        useEvents(submit, {
+          click: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (form && form.checkValidity()) {
+              alert('Form submitted successfully!');
+              closeModal();
+            } else if (form) {
+              form.reportValidity();
+            }
+          }
+        });
+      }
+
+      // Handle form submit event (in case form is submitted via enter key)
+      if (form) {
+        useEvents(form, {
+          submit: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (form.checkValidity()) {
+              alert('Form submitted successfully!');
+              closeModal();
+            } else {
+              form.reportValidity();
+            }
+          }
+        });
+      }
+
+      // Handle confirmation
+      if (confirm) {
+        useEvents(confirm, {
+          click: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            alert('Item deleted successfully!');
+            closeModal();
+          }
+        });
+      }
+
+      // Handle backdrop click (native dialog behavior)
+      useEvents(el, {
+        click: (e) => {
+          // Close if clicking on the dialog backdrop
+          if (e.target === el) {
+            closeModal();
+          }
+        }
+      });
+
+      // Handle escape key (enhanced)
+      const handleEscape = (e) => {
+        if (e.key === 'Escape' && isOpen.value) {
+          closeModal();
+        }
+      };
+
+      document.addEventListener('keydown', handleEscape);
+
+      // Cleanup function
+      return () => {
+        if (isOpen.value) {
+          closeModal();
+        }
+        // Remove from registry
+        if (modalId) {
+          modalRegistry.delete(modalId);
+        }
+        // Remove escape key listener
+        document.removeEventListener('keydown', handleEscape);
+      };
+    };
+
+    // Register the hook and component
+    registerHook(useModalTrigger);
+    registerComponent(Modal);
+
+    // Start HookTML
+    start({
+      debug: false
+    });
+  </script>
+</body>
+
+</html>
