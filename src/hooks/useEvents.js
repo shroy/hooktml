@@ -1,16 +1,16 @@
 /**
  * Hook for adding event listeners with automatic cleanup
- * @param {HTMLElement} element - The element to attach events to
+ * @param {EventTarget} element - The element to attach events to (HTMLElement, Document, or Window)
  * @param {Record<string, EventListener|{value: EventListener, subscribe: Function}>} eventMap - Object mapping event names to handlers or signals containing handlers
  * @returns {Function} Cleanup function that removes all event listeners
  */
-import { isHTMLElement, isNonEmptyObject, isFunction, isSignal } from '../utils/type-guards.js'
+import { isEventTarget, isNonEmptyObject, isFunction, isSignal } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { logger } from '../utils/logger.js'
 
 export const useEvents = (element, eventMap) => {
-  if (!isHTMLElement(element)) {
-    throw new Error('[HookTML] useEvents requires an HTMLElement as first argument')
+  if (!isEventTarget(element)) {
+    throw new Error('[HookTML] useEvents requires an EventTarget (HTMLElement, Document, or Window) as first argument')
   }
 
   if (!isNonEmptyObject(eventMap)) {

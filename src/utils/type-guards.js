@@ -4,7 +4,7 @@
  * @param {unknown} value - The value to check.
  * @returns {value is null | undefined} Whether or not the value is null or undefined.
  */
-export const isNil = value => 
+export const isNil = value =>
   value === null || typeof value === 'undefined'
 
 /**
@@ -108,6 +108,16 @@ export const isNonEmptyArray = value => isArray(value) && value.length > 0
  * @returns {value is HTMLElement} Whether or not the value is an HTMLElement
  */
 export const isHTMLElement = value => value instanceof HTMLElement
+
+/**
+ * Check if a value is a valid event target (HTMLElement, Document, or Window)
+ * @param {unknown} value
+ * @returns {value is EventTarget} Whether or not the value is a valid event target
+ */
+export const isEventTarget = value =>
+  value instanceof HTMLElement ||
+  value instanceof Document ||
+  value instanceof Window
 
 /**
  * Check if a value is an object
