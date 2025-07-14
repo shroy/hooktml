@@ -1,63 +1,78 @@
-/**
- * Hook for applying inline styles to an element
- * @param {HTMLElement|null|undefined} element - The element to apply styles to (or null/undefined)
- * @param {Partial<CSSStyleDeclaration>|Record<string, string|{value: string, subscribe: Function}>} styleMap - Object mapping style properties to values or signals
- * @returns {Function} Cleanup function that removes all applied styles
- */
 import { kebabToCamel } from '../utils/strings.js'
-import { isFunction, isHTMLElement, isNonEmptyArray, isNonEmptyObject, isSignal, isNil } from '../utils/type-guards.js'
+import { isFunction, isHTMLElement, isHTMLElementArray, isNonEmptyArray, isNonEmptyObject, isSignal, isNil } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { tryCatch } from '../utils/try-catch.js'
 import { logger } from '../utils/logger.js'
 
-export const useStyles = (element, styleMap) => {
+/**
+ * Hook for applying inline styles to an element or array of elements
+ * @param {HTMLElement|HTMLElement[]|null|undefined} elementOrElements - The element(s) to apply styles to (or null/undefined)
+ * @param {Partial<CSSStyleDeclaration>|Record<string, string|{value: string, subscribe: Function}|Function>} styleMap - Object mapping style properties to values, signals, or functions
+ * @returns {Function} Cleanup function that removes all applied styles
+ */
+export const useStyles = (elementOrElements, styleMap) => {
 
-  if (isNil(element)) {
+  if (isNil(elementOrElements)) {
     logger.warn('[HookTML] useStyles called with null/undefined element, skipping style application')
     return () => { } // Return no-op cleanup function
   }
 
-  if (!isHTMLElement(element)) {
-    throw new Error('[HookTML] useStyles requires an HTMLElement as first argument')
+  const elements = isHTMLElementArray(elementOrElements) ? elementOrElements : [elementOrElements]
+
+  if (elements.some(element => !isHTMLElement(element))) {
+    throw new Error('[HookTML] useStyles requires HTMLElement(s) as first argument')
   }
 
   if (!isNonEmptyObject(styleMap)) {
     throw new Error('[HookTML] useStyles requires a non-empty object mapping style properties to values')
   }
 
-  // Extract signals from styleMap for effect dependencies
   const signalDeps = Object.values(styleMap).filter(isSignal)
 
-  // Track which styles we've modified for cleanup
-  const modifiedStyles = new Map()
+  const modifiedStylesPerElement = new WeakMap()
+
+  // Function to evaluate a condition for a specific element
+  const evaluateCondition = (condition, element) => {
+    if (isFunction(condition)) {
+      return condition(element)
+    } else if (isSignal(condition)) {
+      return condition.value
+    } else {
+      return condition
+    }
+  }
 
   // Function to apply styles
   const applyStyles = () => {
-    Object.entries(styleMap).forEach(([prop, valueOrSignal]) => {
-      // Convert kebab-case to camelCase if needed
-      const cssProp = prop.includes('-')
-        ? kebabToCamel(prop)
-        : prop
-
-      // Store original value for potential cleanup
-      if (!modifiedStyles.has(cssProp)) {
-        modifiedStyles.set(cssProp, element.style[cssProp])
+    elements.forEach(element => {
+      let modifiedStyles = modifiedStylesPerElement.get(element)
+      if (!modifiedStyles) {
+        modifiedStyles = new Map()
+        modifiedStylesPerElement.set(element, modifiedStyles)
       }
 
-      // Extract the actual value (either direct or from signal)
-      const value = isSignal(valueOrSignal)
-        ? valueOrSignal.value
-        : valueOrSignal
+      Object.entries(styleMap).forEach(([prop, valueOrSignal]) => {
+        // Convert kebab-case to camelCase if needed
+        const cssProp = prop.includes('-')
+          ? kebabToCamel(prop)
+          : prop
 
-      // Apply the new value
-      element.style[cssProp] = value
+        // Store original value for potential cleanup
+        if (!modifiedStyles.has(cssProp)) {
+          modifiedStyles.set(cssProp, element.style[cssProp])
+        }
+
+        // Extract the actual value (either direct, from signal, or from function)
+        const value = evaluateCondition(valueOrSignal, element)
+
+        // Apply the new value
+        element.style[cssProp] = value
+      })
     })
   }
 
-  // Apply styles immediately
   applyStyles()
 
-  // Set up reactive updates if any signals were provided
   if (isNonEmptyArray(signalDeps)) {
     tryCatch({
       fn: () => {
@@ -73,27 +88,36 @@ export const useStyles = (element, styleMap) => {
         // Since we've already filtered with isSignal, we know these have a subscribe method
         const unsubscribes = signalDeps.map(signal => signal.subscribe(() => applyStyles()))
 
-        // Add cleanup for manual subscriptions to modifiedStyles for proper teardown
-        const originalCleanup = modifiedStyles.get('__cleanup')
-        modifiedStyles.set('__cleanup', () => {
-          unsubscribes.forEach(unsub => unsub())
-          if (isFunction(originalCleanup)) originalCleanup()
+        // Add cleanup for manual subscriptions to each element's modifiedStyles for proper teardown
+        elements.forEach(element => {
+          const modifiedStyles = modifiedStylesPerElement.get(element)
+          if (modifiedStyles) {
+            const originalCleanup = modifiedStyles.get('__cleanup')
+            modifiedStyles.set('__cleanup', () => {
+              unsubscribes.forEach(unsub => unsub())
+              if (isFunction(originalCleanup)) originalCleanup()
+            })
+          }
         })
       }
     })
   }
 
-  // Return cleanup function
   return () => {
-    // Run any stored cleanup function first
-    const cleanup = modifiedStyles.get('__cleanup')
-    if (isFunction(cleanup)) cleanup()
+    elements.forEach(element => {
+      const modifiedStyles = modifiedStylesPerElement.get(element)
+      if (modifiedStyles) {
+        // Run any stored cleanup function first
+        const cleanup = modifiedStyles.get('__cleanup')
+        if (isFunction(cleanup)) cleanup()
 
-    // Restore original style values
-    modifiedStyles.forEach((originalValue, prop) => {
-      if (prop === '__cleanup') return
-      element.style[prop] = originalValue
+        // Restore original style values
+        modifiedStyles.forEach((originalValue, prop) => {
+          if (prop === '__cleanup') return
+          element.style[prop] = originalValue
+        })
+        modifiedStyles.clear()
+      }
     })
-    modifiedStyles.clear()
   }
 } 
