@@ -1,6 +1,7 @@
 import {
   isFunction,
   isHTMLElement,
+  isHTMLElementArray,
   isNil,
   isNonEmptyArray,
   isNonEmptyObject,
@@ -12,54 +13,66 @@ import { tryCatch } from '../utils/try-catch.js'
 import { logger } from '../utils/logger.js'
 
 /**
- * Hook for setting HTML attributes on an element
- * @param {HTMLElement|null|undefined} element - The element to set attributes on (or null/undefined)
- * @param {Record<string, string|null|{value: string|null, subscribe: Function}>} attrMap - Object mapping attribute names to string values, null to remove, or signals
+ * Hook for setting HTML attributes on an element or array of elements
+ * @param {HTMLElement|HTMLElement[]|null|undefined} elementOrElements - The element(s) to set attributes on (or null/undefined)
+ * @param {Record<string, string|null|{value: string|null, subscribe: Function}|Function>} attrMap - Object mapping attribute names to string values, null to remove, signals, or functions
  * @returns {Function} Cleanup function that removes all applied attributes
  */
-export const useAttributes = (element, attrMap) => {
-  // Handle null/undefined elements gracefully
-  if (isNil(element)) {
+export const useAttributes = (elementOrElements, attrMap) => {
+
+  if (isNil(elementOrElements)) {
     logger.warn('[HookTML] useAttributes called with null/undefined element, skipping attribute application')
     return () => { } // Return no-op cleanup function
   }
 
-  if (!isHTMLElement(element)) {
-    throw new Error('[HookTML] useAttributes requires an HTMLElement as first argument')
+  const elements = isHTMLElementArray(elementOrElements) ? elementOrElements : [elementOrElements]
+
+  if (elements.some(element => !isHTMLElement(element))) {
+    throw new Error('[HookTML] useAttributes requires HTMLElement(s) as first argument')
   }
 
   if (!isNonEmptyObject(attrMap)) {
     throw new Error('[HookTML] useAttributes requires a non-empty object mapping attribute names to values')
   }
 
-  // Extract signals from attrMap for effect dependencies
   const signalDeps = Object.values(attrMap).filter(isSignal)
 
-  // Track which attributes we've modified for cleanup
-  const modifiedAttributes = new Map()
+  const modifiedAttributesPerElement = new WeakMap()
 
-  // Function to apply attributes
+  const evaluateCondition = (condition, element) => {
+    if (isFunction(condition)) {
+      return condition(element)
+    } else if (isSignal(condition)) {
+      return condition.value
+    } else {
+      return condition
+    }
+  }
+
   const applyAttributes = () => {
-    Object.entries(attrMap).forEach(([attrName, valueOrSignal]) => {
-      // Store original value for potential cleanup if not already stored
-      if (!modifiedAttributes.has(attrName)) {
-        modifiedAttributes.set(attrName, element.hasAttribute(attrName)
-          ? element.getAttribute(attrName)
-          : null
-        )
+    elements.forEach(element => {
+      let modifiedAttributes = modifiedAttributesPerElement.get(element)
+      if (!modifiedAttributes) {
+        modifiedAttributes = new Map()
+        modifiedAttributesPerElement.set(element, modifiedAttributes)
       }
 
-      // Extract the actual value (either direct or from signal)
-      const value = isSignal(valueOrSignal)
-        ? valueOrSignal.value
-        : valueOrSignal
+      Object.entries(attrMap).forEach(([attrName, valueOrSignal]) => {
+        if (!modifiedAttributes.has(attrName)) {
+          modifiedAttributes.set(attrName, element.hasAttribute(attrName)
+            ? element.getAttribute(attrName)
+            : null
+          )
+        }
 
-      // Apply the new value (or remove if null)
-      if (isNil(value)) {
-        element.removeAttribute(attrName)
-      } else {
-        element.setAttribute(attrName, value)
-      }
+        const value = evaluateCondition(valueOrSignal, element)
+
+        if (isNil(value)) {
+          element.removeAttribute(attrName)
+        } else {
+          element.setAttribute(attrName, value)
+        }
+      })
     })
   }
 
@@ -84,11 +97,16 @@ export const useAttributes = (element, attrMap) => {
           return isSignal(signal) ? signal.subscribe(() => applyAttributes()) : null
         }).filter(isNotNil)
 
-        // Add cleanup for manual subscriptions to modifiedAttributes for proper teardown
-        const originalCleanup = modifiedAttributes.get('__cleanup')
-        modifiedAttributes.set('__cleanup', () => {
-          unsubscribes.forEach(unsub => unsub())
-          if (isFunction(originalCleanup)) originalCleanup()
+        // Add cleanup for manual subscriptions to each element's modifiedAttributes for proper teardown
+        elements.forEach(element => {
+          const modifiedAttributes = modifiedAttributesPerElement.get(element)
+          if (modifiedAttributes) {
+            const originalCleanup = modifiedAttributes.get('__cleanup')
+            modifiedAttributes.set('__cleanup', () => {
+              unsubscribes.forEach(unsub => unsub())
+              if (isFunction(originalCleanup)) originalCleanup()
+            })
+          }
         })
       }
     })
@@ -96,20 +114,25 @@ export const useAttributes = (element, attrMap) => {
 
   // Return cleanup function
   return () => {
-    // Run any stored cleanup function first
-    const cleanup = modifiedAttributes.get('__cleanup')
-    if (isFunction(cleanup)) cleanup()
+    elements.forEach(element => {
+      const modifiedAttributes = modifiedAttributesPerElement.get(element)
+      if (modifiedAttributes) {
+        // Run any stored cleanup function first
+        const cleanup = modifiedAttributes.get('__cleanup')
+        if (isFunction(cleanup)) cleanup()
 
-    // Restore original attribute values
-    modifiedAttributes.forEach((originalValue, attrName) => {
-      if (attrName === '__cleanup') return
+        // Restore original attribute values
+        modifiedAttributes.forEach((originalValue, attrName) => {
+          if (attrName === '__cleanup') return
 
-      if (isNil(originalValue)) {
-        element.removeAttribute(attrName)
-      } else {
-        element.setAttribute(attrName, originalValue)
+          if (isNil(originalValue)) {
+            element.removeAttribute(attrName)
+          } else {
+            element.setAttribute(attrName, originalValue)
+          }
+        })
+        modifiedAttributes.clear()
       }
     })
-    modifiedAttributes.clear()
   }
 } 
