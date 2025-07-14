@@ -644,7 +644,7 @@ useClasses(button, {
 });
 
 // Set inline styles
-useStyle(modal, {
+useStyles(modal, {
   maxHeight: `${window.innerHeight * 0.8}px`,
   zIndex: 100
 });
@@ -656,7 +656,38 @@ useAttributes(toggle, {
 });
 ```
 
-These hooks make your styling logic more readable and maintainable. See the [API Reference](#api-reference) section for complete details on these utility hooks.
+#### Array Support
+
+All styling hooks also support arrays of elements with per-element logic using functions:
+
+```js
+// Apply different styles to each element
+useClasses(tabButtons, {
+  active: (btn) => selectedTab.value === btn.dataset.id,
+  disabled: isGloballyDisabled  // Mix with direct values/signals
+});
+
+useStyles(cardElements, {
+  backgroundColor: (card) => card.dataset.theme,
+  transform: (card) => `scale(${card.dataset.scale || 1})`
+});
+
+useAttributes(menuItems, {
+  'aria-selected': (item) => activeItem.value === item.dataset.id ? 'true' : 'false',
+  'tabindex': (item) => item.dataset.disabled ? '-1' : '0'
+});
+
+// Events work with arrays too (handlers receive event object)
+useEvents([button1, button2], {
+  click: (event) => handleClick(event.target.dataset.action)
+});
+
+useEvents(document, {
+  keydown: (event) => event.key === 'Escape' && closeModal()
+});
+```
+
+These hooks make your styling logic more readable and maintainable, whether working with single elements or multiple elements. See the [API Reference](#api-reference) section for complete details on these utility hooks.
 
 ### FOUC Prevention
 
@@ -694,10 +725,10 @@ The `data-hooktml-cloak` attribute is removed automatically once behavior is rea
 
 | Hook | Description |
 |------|-------------|
-| `useEvents(el, eventMap)` | Bind multiple events declaratively |
-| `useStyle(el, styleObject)` | Apply inline styles |
-| `useAttributes(el, attrMap)` | Set DOM attributes |
-| `useClasses(el, classMap)` | Toggle class names based on conditions |
+| `useEvents(el, eventMap)` | Bind multiple events declaratively. Supports arrays of elements and EventTargets (HTMLElement, Document, Window) |
+| `useStyles(el, styleObject)` | Apply inline styles. Supports arrays with per-element functions |
+| `useAttributes(el, attrMap)` | Set DOM attributes. Supports arrays with per-element functions |
+| `useClasses(el, classMap)` | Toggle class names based on conditions. Supports arrays with per-element functions |
 | `useChildren(el, prefix)` | Query child elements with a specific prefix, returning both singular and plural keys for consistent access |
 
 ### Component Return Values
