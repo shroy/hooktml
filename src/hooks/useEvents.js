@@ -1,13 +1,13 @@
+import { isEventTarget, isEventTargetArray, isNonEmptyObject, isFunction, isSignal, isNil } from '../utils/type-guards.js'
+import { useEffect } from '../core/hookContext.js'
+import { logger } from '../utils/logger.js'
+
 /**
  * Hook for adding event listeners with automatic cleanup
  * @param {EventTarget|EventTarget[]|null|undefined} elementOrElements - The element(s) to attach events to (HTMLElement, Document, Window, array of these, or null/undefined)
  * @param {Record<string, EventListener|{value: EventListener, subscribe: Function}>} eventMap - Object mapping event names to handlers or signals containing handlers
  * @returns {Function} Cleanup function that removes all event listeners
  */
-import { isEventTarget, isEventTargetArray, isNonEmptyObject, isFunction, isSignal, isNil } from '../utils/type-guards.js'
-import { useEffect } from '../core/hookContext.js'
-import { logger } from '../utils/logger.js'
-
 export const useEvents = (elementOrElements, eventMap) => {
   // Handle null/undefined elements gracefully
   if (isNil(elementOrElements)) {

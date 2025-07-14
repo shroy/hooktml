@@ -140,6 +140,13 @@ export const isEventTarget = value => {
 export const isEventTargetArray = value => isNonEmptyArray(value) && value.every(isEventTarget)
 
 /**
+ * Check if a value is an array of HTMLElements
+ * @param {unknown} value
+ * @returns {value is HTMLElement[]} Whether or not the value is an array of HTMLElements
+ */
+export const isHTMLElementArray = value => isNonEmptyArray(value) && value.every(isHTMLElement)
+
+/**
  * Check if a value is an object
  * @param {unknown} value
  * @returns {value is Record<string, unknown>} Whether or not the value is an object

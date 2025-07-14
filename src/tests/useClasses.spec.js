@@ -106,8 +106,10 @@ describe('useClasses', () => {
   })
 
   it('should throw an error if classMap is not a non-empty object', () => {
+    // @ts-expect-error
     expect(() => useClasses(element, null)).toThrow()
     expect(() => useClasses(element, {})).toThrow()
+    // @ts-expect-error
     expect(() => useClasses(element, 'string')).toThrow()
   })
 
@@ -182,6 +184,178 @@ describe('useClasses', () => {
       expect(element.classList.contains('active')).toBe(true)
       expect(element.classList.contains('selected')).toBe(true)
       expect(element.classList.contains('highlighted')).toBe(false)
+    })
+  })
+
+  describe('Array Support', () => {
+    let elements
+
+    beforeEach(() => {
+      // Create multiple elements for array testing
+      elements = [
+        document.createElement('div'),
+        document.createElement('div'),
+        document.createElement('div')
+      ]
+
+      elements.forEach((el, index) => {
+        el.setAttribute('data-id', index.toString())
+        document.body.appendChild(el)
+      })
+    })
+
+    it('should handle array of elements with function conditions', () => {
+      useClasses(elements, {
+        active: (el) => el.dataset.id === '1',
+        first: (el) => el.dataset.id === '0',
+        even: (el) => parseInt(el.dataset.id) % 2 === 0
+      })
+
+      expect(elements[0].classList.contains('active')).toBe(false)
+      expect(elements[0].classList.contains('first')).toBe(true)
+      expect(elements[0].classList.contains('even')).toBe(true)
+
+      expect(elements[1].classList.contains('active')).toBe(true)
+      expect(elements[1].classList.contains('first')).toBe(false)
+      expect(elements[1].classList.contains('even')).toBe(false)
+
+      expect(elements[2].classList.contains('active')).toBe(false)
+      expect(elements[2].classList.contains('first')).toBe(false)
+      expect(elements[2].classList.contains('even')).toBe(true)
+    })
+
+    it('should handle mixed function, signal, and boolean conditions', () => {
+      const isGloballyDisabled = signal(false)
+
+      withHookContext(elements[0], () => {
+        useClasses(elements, {
+          active: (el) => el.dataset.id === '1',
+          disabled: isGloballyDisabled,
+          visible: true
+        })
+
+        elements.forEach((el, index) => {
+          expect(el.classList.contains('active')).toBe(index === 1)
+          expect(el.classList.contains('disabled')).toBe(false)
+          expect(el.classList.contains('visible')).toBe(true)
+        })
+
+        isGloballyDisabled.value = true
+
+        const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
+        const effectCall = executeEffectSpy.mock.calls[0]
+        const effectFn = effectCall[0]
+        effectFn()
+
+        elements.forEach((el, index) => {
+          expect(el.classList.contains('active')).toBe(index === 1)
+          expect(el.classList.contains('disabled')).toBe(true)
+          expect(el.classList.contains('visible')).toBe(true)
+        })
+      })
+    })
+
+    it('should cleanup classes correctly for each element', () => {
+      const cleanup = useClasses(elements, {
+        active: (el) => el.dataset.id === '1',
+        test: true
+      })
+
+      expect(elements[1].classList.contains('active')).toBe(true)
+      elements.forEach(el => {
+        expect(el.classList.contains('test')).toBe(true)
+      })
+
+      elements.forEach(el => {
+        el.classList.add('manual')
+      })
+
+      cleanup()
+
+      elements.forEach((el) => {
+        expect(el.classList.contains('active')).toBe(false)
+        expect(el.classList.contains('test')).toBe(false)
+        expect(el.classList.contains('manual')).toBe(true) // Manual class preserved
+      })
+    })
+
+    it('should handle single element passed as array', () => {
+      const singleElementArray = [elements[0]]
+
+      useClasses(singleElementArray, {
+        single: true,
+        test: (el) => el.dataset.id === '0'
+      })
+
+      expect(elements[0].classList.contains('single')).toBe(true)
+      expect(elements[0].classList.contains('test')).toBe(true)
+      expect(elements[1].classList.contains('single')).toBe(false)
+      expect(elements[2].classList.contains('single')).toBe(false)
+    })
+
+    it('should maintain backward compatibility with single elements', () => {
+      useClasses(elements[0], {
+        active: true,
+        hidden: false
+      })
+
+      expect(elements[0].classList.contains('active')).toBe(true)
+      expect(elements[0].classList.contains('hidden')).toBe(false)
+      expect(elements[1].classList.contains('active')).toBe(false)
+      expect(elements[2].classList.contains('active')).toBe(false)
+    })
+
+    it('should handle reactivity with signals in function conditions', () => {
+      const selectedId = signal('1')
+
+      withHookContext(elements[0], () => {
+        useClasses(elements, {
+          selected: (el) => selectedId.value === el.dataset.id,
+          static: true
+        })
+
+        elements.forEach((el, index) => {
+          expect(el.classList.contains('selected')).toBe(index === 1)
+          expect(el.classList.contains('static')).toBe(true)
+        })
+
+        selectedId.value = '2'
+
+        const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
+        const effectCall = executeEffectSpy.mock.calls[0]
+        const effectFn = effectCall[0]
+        effectFn()
+
+        elements.forEach((el, index) => {
+          expect(el.classList.contains('selected')).toBe(index === 2)
+          expect(el.classList.contains('static')).toBe(true)
+        })
+      })
+    })
+
+    it('should handle null/undefined in array gracefully', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+
+      const cleanupNull = useClasses(null, { 'active': true })
+
+      const cleanupUndefined = useClasses(undefined, { 'active': true })
+
+      expect(consoleSpy).toHaveBeenCalledTimes(2)
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('useClasses called with null/undefined element'))
+
+      expect(typeof cleanupNull).toBe('function')
+      expect(typeof cleanupUndefined).toBe('function')
+
+      expect(() => cleanupNull()).not.toThrow()
+      expect(() => cleanupUndefined()).not.toThrow()
+
+      consoleSpy.mockRestore()
+    })
+
+    it('should throw error for invalid elements in array', () => {
+      const invalidArray = [elements[0], 'not-an-element', elements[1]]
+
+      expect(() => useClasses(invalidArray, { 'test': true })).toThrow('[HookTML] useClasses requires HTMLElement(s) as first argument')
     })
   })
 }) 
