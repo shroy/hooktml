@@ -22,13 +22,13 @@ import { logger } from '../utils/logger.js'
 export const useAttributes = (elementOrElements, attrMap) => {
 
   if (isNil(elementOrElements)) {
-    logger.warn('[HookTML] useAttributes called with null/undefined element, skipping attribute setting')
+    logger.info('[HookTML] useAttributes called with null/undefined element, skipping attribute setting')
     return () => { } // Return no-op cleanup function
   }
 
   // Handle empty arrays gracefully
   if (isEmptyArray(elementOrElements)) {
-    logger.warn('[HookTML] useAttributes called with empty array, skipping attribute setting')
+    logger.info('[HookTML] useAttributes called with empty array, skipping attribute setting')
     return () => { } // Return no-op cleanup function
   }
 

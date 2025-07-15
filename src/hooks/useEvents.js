@@ -20,12 +20,12 @@ import { logger } from '../utils/logger.js'
 export const useEvents = (elementOrElements, eventMap) => {
 
   if (isNil(elementOrElements)) {
-    logger.warn('[HookTML] useEvents called with null/undefined element, skipping event registration')
+    logger.info('[HookTML] useEvents called with null/undefined element, skipping event registration')
     return () => { } // Return no-op cleanup function
   }
 
   if (isEmptyArray(elementOrElements)) {
-    logger.warn('[HookTML] useEvents called with empty array, skipping event registration')
+    logger.info('[HookTML] useEvents called with empty array, skipping event registration')
     return () => { } // Return no-op cleanup function
   }
 

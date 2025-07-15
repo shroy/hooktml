@@ -218,6 +218,8 @@
       <p><strong>Features:</strong> Native HTML5 dialog element enhanced with HookTML. Uses
         <code>use-modal-trigger</code> hook for declarative triggers and <code>modal-modal-id</code> component props for
         identification. Includes backdrop click closing, escape key handling, focus management, and automatic cleanup.
+        <strong>New:</strong> Demonstrates HookTML's array support - multiple close buttons handled with a single
+        <code>useEvents(closeButtons, {...})</code> call instead of manual loops.
       </p>
     </div>
   </div>
@@ -300,7 +302,6 @@
   </dialog>
 
   <script>
-    // Destructure HookTML functions
     const { signal, useEffect, useEvents, registerComponent, registerHook, start } = HookTML;
 
     // Store modal registry for communication between triggers and modals
@@ -321,10 +322,17 @@
     };
 
     // Modal Dialog Component
-    const Modal = (el, props) => {
-
-      const { closes, submit, confirm, form, header, body, footer, title } = props.children;
-      const modalId = props.modalId; // Now using proper HookTML props
+    const Modal = (el, { modalId, children }) => {
+      const {
+        header,
+        body,
+        footer,
+        title,
+        form,
+        closes,
+        submit,
+        confirm,
+      } = children;
 
       // State
       const isOpen = signal(false);
@@ -360,61 +368,51 @@
         });
       }
 
-      // Handle close buttons (multiple possible)
-      if (closes && closes.length) {
-        closes.forEach(button => {
-          useEvents(button, {
-            click: (e) => {
-              e.preventDefault();
-              closeModal();
-            }
-          });
-        });
-      }
+      // Handle close buttons (multiple possible) - Using HookTML array support
+      useEvents(closes, {
+        click: (e) => {
+          e.preventDefault();
+          closeModal();
+        }
+      });
 
       // Handle form submission
-      if (submit) {
-        useEvents(submit, {
-          click: (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (form && form.checkValidity()) {
-              alert('Form submitted successfully!');
-              closeModal();
-            } else if (form) {
-              form.reportValidity();
-            }
+      useEvents(submit, {
+        click: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (form && form.checkValidity()) {
+            alert('Form submitted successfully!');
+            closeModal();
+          } else if (form) {
+            form.reportValidity();
           }
-        });
-      }
+        }
+      });
 
       // Handle form submit event (in case form is submitted via enter key)
-      if (form) {
-        useEvents(form, {
-          submit: (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (form.checkValidity()) {
-              alert('Form submitted successfully!');
-              closeModal();
-            } else {
-              form.reportValidity();
-            }
+      useEvents(form, {
+        submit: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (form.checkValidity()) {
+            alert('Form submitted successfully!');
+            closeModal();
+          } else {
+            form.reportValidity();
           }
-        });
-      }
+        }
+      });
 
       // Handle confirmation
-      if (confirm) {
-        useEvents(confirm, {
-          click: (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            alert('Item deleted successfully!');
-            closeModal();
-          }
-        });
-      }
+      useEvents(confirm, {
+        click: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          alert('Item deleted successfully!');
+          closeModal();
+        }
+      });
 
       // Handle backdrop click (native dialog behavior)
       useEvents(el, {
@@ -426,14 +424,14 @@
         }
       });
 
-      // Handle escape key (enhanced)
-      const handleEscape = (e) => {
-        if (e.key === 'Escape' && isOpen.value) {
-          closeModal();
-        }
-      };
 
-      document.addEventListener('keydown', handleEscape);
+      useEvents(document, {
+        keydown: (e) => {
+          if (e.key === 'Escape' && isOpen.value) {
+            closeModal();
+          }
+        }
+      });
 
       // Cleanup function
       return () => {
@@ -444,8 +442,6 @@
         if (modalId) {
           modalRegistry.delete(modalId);
         }
-        // Remove escape key listener
-        document.removeEventListener('keydown', handleEscape);
       };
     };
 
@@ -454,9 +450,7 @@
     registerComponent(Modal);
 
     // Start HookTML
-    start({
-      debug: false
-    });
+    start({ debug: false });
   </script>
 </body>
 

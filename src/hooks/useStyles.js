@@ -22,12 +22,12 @@ import { logger } from '../utils/logger.js'
 export const useStyles = (elementOrElements, styleMap) => {
 
   if (isNil(elementOrElements)) {
-    logger.warn('[HookTML] useStyles called with null/undefined element, skipping style application')
+    logger.info('[HookTML] useStyles called with null/undefined element, skipping style application')
     return () => { } // Return no-op cleanup function
   }
 
   if (isEmptyArray(elementOrElements)) {
-    logger.warn('[HookTML] useStyles called with empty array, skipping style application')
+    logger.info('[HookTML] useStyles called with empty array, skipping style application')
     return () => { } // Return no-op cleanup function
   }
 
