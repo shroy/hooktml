@@ -3,6 +3,7 @@ import { useEvents } from '../hooks/useEvents.js'
 import { signal } from '../core/signal.js'
 import { withHookContext } from '../core/hookContext.js'
 import * as hookContext from '../core/hookContext.js'
+import { logger } from '../utils/logger.js'
 
 describe('useEvents', () => {
   let element
@@ -81,22 +82,40 @@ describe('useEvents', () => {
   })
 
   it('should gracefully handle null/undefined elements with warning', () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+    const warnSpy = vi.spyOn(logger, 'warn')
 
-    const cleanupNull = useEvents(null, { click: vi.fn() })
+    const cleanup1 = useEvents(null, { click: vi.fn() })
+    const cleanup2 = useEvents(undefined, { click: vi.fn() })
 
-    const cleanupUndefined = useEvents(undefined, { click: vi.fn() })
+    expect(warnSpy).toHaveBeenCalledWith('[HookTML] useEvents called with null/undefined element, skipping event registration')
+    expect(warnSpy).toHaveBeenCalledTimes(2)
 
-    expect(consoleSpy).toHaveBeenCalledTimes(2)
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('useEvents called with null/undefined element'))
+    // Should return no-op cleanup functions
+    expect(typeof cleanup1).toBe('function')
+    expect(typeof cleanup2).toBe('function')
 
-    expect(typeof cleanupNull).toBe('function')
-    expect(typeof cleanupUndefined).toBe('function')
+    // Should not throw when called
+    expect(() => cleanup1()).not.toThrow()
+    expect(() => cleanup2()).not.toThrow()
 
-    expect(() => cleanupNull()).not.toThrow()
-    expect(() => cleanupUndefined()).not.toThrow()
+    warnSpy.mockRestore()
+  })
 
-    consoleSpy.mockRestore()
+  it('should gracefully handle empty arrays with warning', () => {
+    const warnSpy = vi.spyOn(logger, 'warn')
+
+    const cleanup = useEvents([], { click: vi.fn() })
+
+    expect(warnSpy).toHaveBeenCalledWith('[HookTML] useEvents called with empty array, skipping event registration')
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+
+    // Should return no-op cleanup function
+    expect(typeof cleanup).toBe('function')
+
+    // Should not throw when called
+    expect(() => cleanup()).not.toThrow()
+
+    warnSpy.mockRestore()
   })
 
   it('should throw an error if called with invalid non-EventTarget elements', () => {

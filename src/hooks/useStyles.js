@@ -1,5 +1,14 @@
 import { kebabToCamel } from '../utils/strings.js'
-import { isFunction, isHTMLElement, isHTMLElementArray, isNonEmptyArray, isNonEmptyObject, isSignal, isNil } from '../utils/type-guards.js'
+import {
+  isFunction,
+  isHTMLElement,
+  isHTMLElementArray,
+  isNonEmptyObject,
+  isSignal,
+  isNil,
+  isEmptyArray,
+  isNonEmptyArray
+} from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { tryCatch } from '../utils/try-catch.js'
 import { logger } from '../utils/logger.js'
@@ -17,6 +26,11 @@ export const useStyles = (elementOrElements, styleMap) => {
     return () => { } // Return no-op cleanup function
   }
 
+  if (isEmptyArray(elementOrElements)) {
+    logger.warn('[HookTML] useStyles called with empty array, skipping style application')
+    return () => { } // Return no-op cleanup function
+  }
+
   const elements = isHTMLElementArray(elementOrElements) ? elementOrElements : [elementOrElements]
 
   if (elements.some(element => !isHTMLElement(element))) {
@@ -31,7 +45,6 @@ export const useStyles = (elementOrElements, styleMap) => {
 
   const modifiedStylesPerElement = new WeakMap()
 
-  // Function to evaluate a condition for a specific element
   const evaluateCondition = (condition, element) => {
     if (isFunction(condition)) {
       return condition(element)
@@ -42,7 +55,6 @@ export const useStyles = (elementOrElements, styleMap) => {
     }
   }
 
-  // Function to apply styles
   const applyStyles = () => {
     elements.forEach(element => {
       let modifiedStyles = modifiedStylesPerElement.get(element)
@@ -52,20 +64,16 @@ export const useStyles = (elementOrElements, styleMap) => {
       }
 
       Object.entries(styleMap).forEach(([prop, valueOrSignal]) => {
-        // Convert kebab-case to camelCase if needed
         const cssProp = prop.includes('-')
           ? kebabToCamel(prop)
           : prop
 
-        // Store original value for potential cleanup
         if (!modifiedStyles.has(cssProp)) {
           modifiedStyles.set(cssProp, element.style[cssProp])
         }
 
-        // Extract the actual value (either direct, from signal, or from function)
         const value = evaluateCondition(valueOrSignal, element)
 
-        // Apply the new value
         element.style[cssProp] = value
       })
     })
@@ -107,11 +115,9 @@ export const useStyles = (elementOrElements, styleMap) => {
     elements.forEach(element => {
       const modifiedStyles = modifiedStylesPerElement.get(element)
       if (modifiedStyles) {
-        // Run any stored cleanup function first
         const cleanup = modifiedStyles.get('__cleanup')
         if (isFunction(cleanup)) cleanup()
 
-        // Restore original style values
         modifiedStyles.forEach((originalValue, prop) => {
           if (prop === '__cleanup') return
           element.style[prop] = originalValue

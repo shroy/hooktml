@@ -6,7 +6,8 @@ import {
   isNonEmptyArray,
   isNonEmptyObject,
   isNotNil,
-  isSignal
+  isSignal,
+  isEmptyArray
 } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { tryCatch } from '../utils/try-catch.js'
@@ -21,7 +22,13 @@ import { logger } from '../utils/logger.js'
 export const useAttributes = (elementOrElements, attrMap) => {
 
   if (isNil(elementOrElements)) {
-    logger.warn('[HookTML] useAttributes called with null/undefined element, skipping attribute application')
+    logger.warn('[HookTML] useAttributes called with null/undefined element, skipping attribute setting')
+    return () => { } // Return no-op cleanup function
+  }
+
+  // Handle empty arrays gracefully
+  if (isEmptyArray(elementOrElements)) {
+    logger.warn('[HookTML] useAttributes called with empty array, skipping attribute setting')
     return () => { } // Return no-op cleanup function
   }
 

@@ -1,4 +1,13 @@
-import { isEventTarget, isEventTargetArray, isNonEmptyObject, isFunction, isSignal, isNil } from '../utils/type-guards.js'
+import {
+  isEventTarget,
+  isEventTargetArray,
+  isNonEmptyObject,
+  isFunction,
+  isSignal,
+  isNil,
+  isEmptyArray,
+  isNonEmptyArray
+} from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { logger } from '../utils/logger.js'
 
@@ -9,13 +18,17 @@ import { logger } from '../utils/logger.js'
  * @returns {Function} Cleanup function that removes all event listeners
  */
 export const useEvents = (elementOrElements, eventMap) => {
-  // Handle null/undefined elements gracefully
+
   if (isNil(elementOrElements)) {
     logger.warn('[HookTML] useEvents called with null/undefined element, skipping event registration')
     return () => { } // Return no-op cleanup function
   }
 
-  // Validate input - accept single element or array of elements
+  if (isEmptyArray(elementOrElements)) {
+    logger.warn('[HookTML] useEvents called with empty array, skipping event registration')
+    return () => { } // Return no-op cleanup function
+  }
+
   const isValidSingle = isEventTarget(elementOrElements)
   const isValidArray = isEventTargetArray(elementOrElements)
 
@@ -23,22 +36,17 @@ export const useEvents = (elementOrElements, eventMap) => {
     throw new Error('[HookTML] useEvents requires an EventTarget or array of EventTargets as first argument')
   }
 
-  // Normalize to array for consistent processing
   const elements = isValidArray ? elementOrElements : [elementOrElements]
 
   if (!isNonEmptyObject(eventMap)) {
     throw new Error('[HookTML] useEvents requires a non-empty object mapping event names to listeners')
   }
 
-  // Extract signals from eventMap for effect dependencies
   const signalDeps = Object.values(eventMap).filter(isSignal)
 
-  // Store current handlers for cleanup - single Map shared across all elements
   const currentHandlers = new Map()
 
-  // Function to update event listeners based on current handlers
   const updateEventListeners = () => {
-    // Remove previous handlers from all elements
     currentHandlers.forEach((handler, eventName) => {
       elements.forEach(element => {
         element.removeEventListener(eventName, handler)
@@ -46,9 +54,7 @@ export const useEvents = (elementOrElements, eventMap) => {
     })
     currentHandlers.clear()
 
-    // Add all event listeners with current values to all elements
     Object.entries(eventMap).forEach(([eventName, handlerOrSignal]) => {
-      // Extract the actual handler (either direct or from signal)
       const handler = isSignal(handlerOrSignal)
         ? handlerOrSignal.value
         : handlerOrSignal
@@ -58,27 +64,22 @@ export const useEvents = (elementOrElements, eventMap) => {
         return
       }
 
-      // Add to all elements
       elements.forEach(element => {
         element.addEventListener(eventName, handler)
       })
 
-      // Store handler once for cleanup
       currentHandlers.set(eventName, handler)
     })
   }
 
-  // Initial setup of event listeners
   updateEventListeners()
 
-  // Set up reactive updates if any signals were provided
-  if (signalDeps.length > 0) {
+  if (isNonEmptyArray(signalDeps)) {
     useEffect(() => {
       updateEventListeners()
     }, signalDeps)
   }
 
-  // Return cleanup function
   return () => {
     currentHandlers.forEach((handler, eventName) => {
       elements.forEach(element => {

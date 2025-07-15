@@ -1,4 +1,13 @@
-import { isHTMLElement, isHTMLElementArray, isNonEmptyArray, isNonEmptyObject, isSignal, isNil, isFunction } from '../utils/type-guards.js'
+import {
+  isHTMLElement,
+  isHTMLElementArray,
+  isNonEmptyArray,
+  isNonEmptyObject,
+  isSignal,
+  isNil,
+  isFunction,
+  isEmptyArray
+} from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
 import { logger } from '../utils/logger.js'
 
@@ -12,6 +21,12 @@ export const useClasses = (elementOrElements, classMap) => {
 
   if (isNil(elementOrElements)) {
     logger.warn('[HookTML] useClasses called with null/undefined element, skipping class application')
+    return () => { } // Return no-op cleanup function
+  }
+
+  // Handle empty arrays gracefully  
+  if (isEmptyArray(elementOrElements)) {
+    logger.warn('[HookTML] useClasses called with empty array, skipping class application')
     return () => { } // Return no-op cleanup function
   }
 
