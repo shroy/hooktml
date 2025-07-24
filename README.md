@@ -26,7 +26,7 @@ See HookTML in action with these interactive examples:
 - **[Currency Converter](https://codepen.io/shroy/pen/bNVbjVP)** - Real-time reactive updates with signals
 - **[Todo App](https://codepen.io/shroy/pen/VYvZBmB)** - Component communication and state management  
 - **[Modal Dialog](https://codepen.io/shroy/pen/qEOdmXe)** - Handling external triggers
-- **[Tabs Component](examples/tabs.html)** - Array support and element collections
+- **[Tabs Component](https://codepen.io/shroy/pen/vENKaQN)** - Array support and element collections
 - **[Counter](https://codepen.io/shroy/pen/myeJmXr)** - Purely using a hook
 
 *All examples use the CDN - no build step required! Fork and experiment.*
