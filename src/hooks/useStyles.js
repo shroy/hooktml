@@ -19,7 +19,7 @@ import { logger } from '../utils/logger.js'
  * @param {Partial<CSSStyleDeclaration>|Record<string, string|{value: string, subscribe: Function}|Function>} styleMap - Object mapping style properties to values, signals, or functions
  * @returns {Function} Cleanup function that removes all applied styles
  */
-export const useStyles = (elementOrElements, styleMap) => {
+export const useStyles = (elementOrElements, styleMap, deps = []) => {
 
   if (isNil(elementOrElements)) {
     logger.info('[HookTML] useStyles called with null/undefined element, skipping style application')
@@ -41,13 +41,14 @@ export const useStyles = (elementOrElements, styleMap) => {
     throw new Error('[HookTML] useStyles requires a non-empty object mapping style properties to values')
   }
 
-  const signalDeps = Object.values(styleMap).filter(isSignal)
+  const implicitDeps = Object.values(styleMap).filter(isSignal)
+  const allDeps = implicitDeps.concat(deps)
 
   const modifiedStylesPerElement = new WeakMap()
 
-  const evaluateCondition = (condition, element) => {
+  const evaluateCondition = (condition, element, index) => {
     if (isFunction(condition)) {
-      return condition(element)
+      return condition(element, index)
     } else if (isSignal(condition)) {
       return condition.value
     } else {
@@ -56,7 +57,7 @@ export const useStyles = (elementOrElements, styleMap) => {
   }
 
   const applyStyles = () => {
-    elements.forEach(element => {
+    elements.forEach((element, index) => {
       let modifiedStyles = modifiedStylesPerElement.get(element)
       if (!modifiedStyles) {
         modifiedStyles = new Map()
@@ -72,7 +73,7 @@ export const useStyles = (elementOrElements, styleMap) => {
           modifiedStyles.set(cssProp, element.style[cssProp])
         }
 
-        const value = evaluateCondition(valueOrSignal, element)
+        const value = evaluateCondition(valueOrSignal, element, index)
 
         element.style[cssProp] = value
       })
@@ -81,12 +82,12 @@ export const useStyles = (elementOrElements, styleMap) => {
 
   applyStyles()
 
-  if (isNonEmptyArray(signalDeps)) {
+  if (isNonEmptyArray(allDeps)) {
     tryCatch({
       fn: () => {
         useEffect(() => {
           applyStyles()
-        }, signalDeps)
+        }, allDeps)
       },
       onError: (error) => {
         logger.error('Error in useStyles:', error)
@@ -94,7 +95,7 @@ export const useStyles = (elementOrElements, styleMap) => {
         // Handle case where useEffect is called outside component/directive context
         // Set up manual signal subscriptions as fallback
         // Since we've already filtered with isSignal, we know these have a subscribe method
-        const unsubscribes = signalDeps.map(signal => signal.subscribe(() => applyStyles()))
+        const unsubscribes = implicitDeps.map(signal => signal.subscribe(() => applyStyles()))
 
         // Add cleanup for manual subscriptions to each element's modifiedStyles for proper teardown
         elements.forEach(element => {

@@ -19,7 +19,7 @@ import { logger } from '../utils/logger.js'
  * @param {Record<string, string|null|{value: string|null, subscribe: Function}|Function>} attrMap - Object mapping attribute names to string values, null to remove, signals, or functions
  * @returns {Function} Cleanup function that removes all applied attributes
  */
-export const useAttributes = (elementOrElements, attrMap) => {
+export const useAttributes = (elementOrElements, attrMap, deps = []) => {
 
   if (isNil(elementOrElements)) {
     logger.info('[HookTML] useAttributes called with null/undefined element, skipping attribute setting')
@@ -42,13 +42,14 @@ export const useAttributes = (elementOrElements, attrMap) => {
     throw new Error('[HookTML] useAttributes requires a non-empty object mapping attribute names to values')
   }
 
-  const signalDeps = Object.values(attrMap).filter(isSignal)
+  const implicitDeps = Object.values(attrMap).filter(isSignal)
+  const allDeps = implicitDeps.concat(deps)
 
   const modifiedAttributesPerElement = new WeakMap()
 
-  const evaluateCondition = (condition, element) => {
+  const evaluateCondition = (condition, element, index) => {
     if (isFunction(condition)) {
-      return condition(element)
+      return condition(element, index)
     } else if (isSignal(condition)) {
       return condition.value
     } else {
@@ -57,7 +58,7 @@ export const useAttributes = (elementOrElements, attrMap) => {
   }
 
   const applyAttributes = () => {
-    elements.forEach(element => {
+    elements.forEach((element, index) => {
       let modifiedAttributes = modifiedAttributesPerElement.get(element)
       if (!modifiedAttributes) {
         modifiedAttributes = new Map()
@@ -72,7 +73,7 @@ export const useAttributes = (elementOrElements, attrMap) => {
           )
         }
 
-        const value = evaluateCondition(valueOrSignal, element)
+        const value = evaluateCondition(valueOrSignal, element, index)
 
         if (isNil(value)) {
           element.removeAttribute(attrName)
@@ -87,12 +88,12 @@ export const useAttributes = (elementOrElements, attrMap) => {
   applyAttributes()
 
   // Set up reactive updates if any signals were provided
-  if (isNonEmptyArray(signalDeps)) {
+  if (isNonEmptyArray(allDeps)) {
     tryCatch({
       fn: () => {
         useEffect(() => {
           applyAttributes()
-        }, signalDeps)
+        }, allDeps)
       },
       onError: (error) => {
         logger.error('Error in useAttributes:', error)
@@ -100,7 +101,7 @@ export const useAttributes = (elementOrElements, attrMap) => {
         // Handle case where useEffect is called outside component/directive context
         // Set up manual signal subscriptions as fallback
         // Since we've already filtered with isSignal, we know these have a subscribe method
-        const unsubscribes = signalDeps.map(signal => {
+        const unsubscribes = implicitDeps.map(signal => {
           return isSignal(signal) ? signal.subscribe(() => applyAttributes()) : null
         }).filter(isNotNil)
 

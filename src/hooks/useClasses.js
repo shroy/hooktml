@@ -17,7 +17,7 @@ import { logger } from '../utils/logger.js'
  * @param {Record<string, boolean|{value: boolean, subscribe: Function}|Function>} classMap - Object mapping class names to boolean conditions, signals, or functions
  * @returns {Function} Cleanup function that removes all event listeners
  */
-export const useClasses = (elementOrElements, classMap) => {
+export const useClasses = (elementOrElements, classMap, deps = []) => {
 
   if (isNil(elementOrElements)) {
     logger.info('[HookTML] useClasses called with null/undefined element, skipping class application')
@@ -42,15 +42,16 @@ export const useClasses = (elementOrElements, classMap) => {
   }
 
   // Extract signals from classMap for effect dependencies (ignore functions)
-  const signalDeps = Object.values(classMap).filter(isSignal)
+  const implicitDeps = Object.values(classMap).filter(isSignal)
+  const allDeps = implicitDeps.concat(deps);
 
   // Track which classes we've added per element for cleanup using WeakMap
   const addedClassesPerElement = new WeakMap()
 
   // Function to evaluate a condition for a specific element
-  const evaluateCondition = (condition, element) => {
+  const evaluateCondition = (condition, element, index) => {
     if (isFunction(condition)) {
-      return Boolean(condition(element))
+      return Boolean(condition(element, index))
     } else if (isSignal(condition)) {
       return Boolean(condition.value)
     } else {
@@ -60,7 +61,7 @@ export const useClasses = (elementOrElements, classMap) => {
 
   // Function to update classes based on current conditions
   const updateClasses = () => {
-    elements.forEach(element => {
+    elements.forEach((element, index) => {
       let addedClasses = addedClassesPerElement.get(element)
       if (!addedClasses) {
         addedClasses = new Set()
@@ -74,7 +75,7 @@ export const useClasses = (elementOrElements, classMap) => {
       addedClasses.clear()
 
       Object.entries(classMap).forEach(([className, condition]) => {
-        const isActive = evaluateCondition(condition, element)
+        const isActive = evaluateCondition(condition, element, index)
 
         if (isActive) {
           element.classList.add(className)
@@ -88,10 +89,10 @@ export const useClasses = (elementOrElements, classMap) => {
   updateClasses()
 
   // Set up reactive updates if any signals were provided
-  if (isNonEmptyArray(signalDeps)) {
+  if (isNonEmptyArray(allDeps)) {
     useEffect(() => {
       updateClasses()
-    }, signalDeps)
+    }, allDeps)
   }
 
   // Return cleanup function
