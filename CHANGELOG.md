@@ -5,14 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2025-07-14
+## [0.4.0] - 2025-07-24
 
 ### Added
 - **Array Support for All Hooks**: All utility hooks now support arrays of elements with per-element logic
-  - `useClasses(elements, { className: (el) => condition })` - Apply classes with element-specific functions
-  - `useStyles(elements, { property: (el) => value })` - Apply styles with element-specific functions  
-  - `useAttributes(elements, { attr: (el) => value })` - Set attributes with element-specific functions
-  - `useEvents(elements, { event: handler })` - Attach events to multiple elements (already supported)
+  - `useClasses(elements, { className: (el, index) => condition })` - Apply classes with element-specific functions
+  - `useStyles(elements, { property: (el, index) => value })` - Apply styles with element-specific functions  
+  - `useAttributes(elements, { attr: (el, index) => value })` - Set attributes with element-specific functions
+  - `useEvents(elements, { event: (event, index) => handler })` - Event handlers receive both event and element index
+- **Manual Dependencies**: All utility hooks now accept optional deps array for explicit reactivity control
+  - `useClasses(elements, classMap, [signal])` - Control when classes update based on signals
+  - `useStyles(elements, styleMap, [signal])` - Control when styles update based on signals
+  - `useAttributes(elements, attrMap, [signal])` - Control when attributes update based on signals
+  - `useEvents(elements, eventMap, [signal])` - Control when event handlers update based on signals
 
 ### Enhanced
 - **Graceful Nil Handling**: All hooks now handle `null`/`undefined` elements gracefully with warnings instead of throwing errors
