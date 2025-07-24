@@ -19,6 +19,18 @@ HookTML is a JavaScript library that lets you add interactive behavior to HTML w
 - 🧹 **Automatic cleanup** - No manual lifecycle management
 - 🚀 **Progressive enhancement** - Perfect for server-rendered apps
 
+## 🚀 Try It Live
+
+See HookTML in action with these interactive examples:
+
+- **[Currency Converter](https://codepen.io/shroy/pen/bNVbjVP)** - Real-time reactive updates with signals
+- **[Todo App](https://codepen.io/shroy/pen/VYvZBmB)** - Component communication and state management  
+- **[Modal Dialog](https://codepen.io/shroy/pen/qEOdmXe)** - Handling external triggers
+- **[Tabs Component](https://codepen.io/shroy/pen/vENKaQN)** - Array support and element collections
+- **[Counter](https://codepen.io/shroy/pen/myeJmXr)** - Purely using a hook
+
+*All examples use the CDN - no build step required! Fork and experiment.*
+
 ## Quick Example
 
 ```html
@@ -644,7 +656,7 @@ useClasses(button, {
 });
 
 // Set inline styles
-useStyle(modal, {
+useStyles(modal, {
   maxHeight: `${window.innerHeight * 0.8}px`,
   zIndex: 100
 });
@@ -656,7 +668,57 @@ useAttributes(toggle, {
 });
 ```
 
-These hooks make your styling logic more readable and maintainable. See the [API Reference](#api-reference) section for complete details on these utility hooks.
+#### Array Support
+
+All styling hooks support arrays of elements with per-element logic using functions that receive both the element and its index:
+
+```js
+// Direct signal values are automatically tracked (no deps needed)
+useClasses(tabButtons, {
+  active: (btn) => btn.dataset.selected === 'true',
+  first: (btn, index) => index === 0,
+  disabled: isGloballyDisabled  // Signal automatically detected
+});
+
+useStyles(cardElements, {
+  backgroundColor: (card) => card.dataset.theme,
+  zIndex: (card, index) => 100 + index,
+  opacity: fadeLevel  // Signal automatically detected
+});
+
+useAttributes(menuItems, {
+  'aria-label': (item) => `Menu item: ${item.textContent}`,
+  'tabindex': (item, index) => index === 0 ? '0' : '-1',
+  'data-visible': isMenuOpen  // Signal automatically detected
+});
+
+// Events work with arrays too (handlers receive event and index)
+useEvents(tabButtons, {
+  click: (event, index) => activeTab.value = index
+});
+```
+
+#### Manual Dependencies
+
+When functions access signals (using `.value`), add them to the dependencies array for reactivity:
+
+```js
+// These functions read signals, so deps are required for reactivity
+useClasses(buttons, {
+  active: (btn, index) => selectedTab.value === index
+}, [selectedTab]);
+
+useStyles(panels, {
+  opacity: (panel, index) => activePanel.value === index ? 1 : 0.5,
+  transform: (panel, index) => isAnimating.value ? 'scale(0.95)' : 'scale(1)'
+}, [activePanel, isAnimating]);
+
+useAttributes(toggles, {
+  'aria-expanded': (toggle, index) => openItems.value.includes(index) ? 'true' : 'false'
+}, [openItems]);
+```
+
+These hooks make your styling logic more readable and maintainable, whether working with single elements or multiple elements. See the [API Reference](#api-reference) section for complete details on these utility hooks.
 
 ### FOUC Prevention
 
@@ -694,10 +756,10 @@ The `data-hooktml-cloak` attribute is removed automatically once behavior is rea
 
 | Hook | Description |
 |------|-------------|
-| `useEvents(el, eventMap)` | Bind multiple events declaratively |
-| `useStyle(el, styleObject)` | Apply inline styles |
-| `useAttributes(el, attrMap)` | Set DOM attributes |
-| `useClasses(el, classMap)` | Toggle class names based on conditions |
+| `useEvents(el, eventMap, deps?)` | Bind multiple events declaratively. Supports arrays of elements and EventTargets (HTMLElement, Document, Window) |
+| `useStyles(el, styleObject, deps?)` | Apply inline styles. Supports arrays with per-element functions |
+| `useAttributes(el, attrMap, deps?)` | Set DOM attributes. Supports arrays with per-element functions |
+| `useClasses(el, classMap, deps?)` | Toggle class names based on conditions. Supports arrays with per-element functions |
 | `useChildren(el, prefix)` | Query child elements with a specific prefix, returning both singular and plural keys for consistent access |
 
 ### Component Return Values

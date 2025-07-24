@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/hooktml@latest/dist/hooktml.min.js"></script>
+  <title>Currency Converter - HookTML Example</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 500px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      background: #f8fafc;
+    }
+
+    .CurrencyConverter {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .converter-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .converter-result {
+      background: #f3f4f6;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #059669;
+      min-height: 1.5rem;
+    }
+
+    .currency-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1rem;
+      align-items: end;
+    }
+
+    h1 {
+      text-align: center;
+      color: #1f2937;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>💱 Currency Converter</h1>
+
+  <div class="Converter">
+    <div class="converter-group">
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" converter-amount placeholder="Enter amount" value="100" min="0" step="0.01">
+    </div>
+
+    <div class="converter-group">
+      <div class="currency-row">
+        <div>
+          <label for="from-currency">From</label>
+          <select id="from-currency" converter-from>
+            <option value="USD">🇺🇸 USD - US Dollar</option>
+            <option value="EUR">🇪🇺 EUR - Euro</option>
+            <option value="GBP">🇬🇧 GBP - British Pound</option>
+            <option value="JPY">🇯🇵 JPY - Japanese Yen</option>
+          </select>
+        </div>
+        <div>
+          <label for="to-currency">To</label>
+          <select id="to-currency" converter-to>
+            <option value="USD">🇺🇸 USD</option>
+            <option value="EUR" selected>🇪🇺 EUR</option>
+            <option value="GBP">🇬🇧 GBP</option>
+            <option value="JPY">🇯🇵 JPY</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="converter-group">
+      <label>Converted Amount</label>
+      <div converter-result class="converter-result">85.00 EUR</div>
+    </div>
+  </div>
+
+  <script>
+    // Simple exchange rates (in real app, fetch from API)
+    const exchangeRates = {
+      USD: { EUR: 0.85, GBP: 0.73, JPY: 110, USD: 1 },
+      EUR: { USD: 1.18, GBP: 0.86, JPY: 129, EUR: 1 },
+      GBP: { USD: 1.37, EUR: 1.16, JPY: 150, GBP: 1 },
+      JPY: { USD: 0.009, EUR: 0.0078, GBP: 0.0067, JPY: 1 }
+    };
+
+    const Converter = (el, props) => {
+      const { amount, from, to, result } = props.children;
+
+      // Reactive signals for state
+      const amountValue = HookTML.signal(parseFloat(amount.value) || 0);
+      const fromCurrency = HookTML.signal(from.value);
+      const toCurrency = HookTML.signal(to.value);
+
+      // Computed signal for conversion
+      const convertedAmount = HookTML.computed(() => {
+        const amt = amountValue.value;
+        const fromCur = fromCurrency.value;
+        const toCur = toCurrency.value;
+
+        if (amt === 0) return '0.00';
+
+        const rate = exchangeRates[fromCur]?.[toCur] || 1;
+        const converted = amt * rate;
+
+        return converted.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+      });
+
+      // Update display when conversion changes
+      HookTML.useEffect(() => {
+        result.textContent = `${convertedAmount.value} ${toCurrency.value}`;
+      }, [convertedAmount, toCurrency]);
+
+      // Listen to input changes
+      HookTML.useEvents(amount, {
+        input: (e) => {
+          amountValue.value = parseFloat(e.target.value) || 0;
+        }
+      });
+
+      HookTML.useEvents(from, {
+        change: (e) => {
+          fromCurrency.value = e.target.value;
+        }
+      });
+
+      HookTML.useEvents(to, {
+        change: (e) => {
+          toCurrency.value = e.target.value;
+        }
+      });
+    };
+
+    // Register the component
+    HookTML.registerComponent(Converter);
+
+    // Start HookTML
+    HookTML.start();
+  </script>
+</body>
+
+</html>

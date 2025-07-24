@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/hooktml@latest/dist/hooktml.min.js"></script>
   <title>Simple Counter - HookTML Example</title>
   <style>
     body {
@@ -140,8 +141,8 @@
     </div>
   </div>
 
-  <script type="module">
-    import { HookTML, signal, useEffect, useEvents, registerHook, useChildren } from '../src/index.js';
+  <script>
+    const { signal, useEffect, useEvents, registerHook, useChildren } = HookTML;
 
     const useCounter = (el, props) => {
       const initialValue = props.initial ? parseInt(props.initial) : 0;
@@ -179,11 +180,7 @@
 
     registerHook(useCounter);
 
-    HookTML.start({
-      debug: true
-    }).then(() => {
-      console.log('🎉 HookTML Counter Example loaded successfully!');
-    });
+    HookTML.start({ debug: false })
   </script>
 </body>
 

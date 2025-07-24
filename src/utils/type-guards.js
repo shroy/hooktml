@@ -4,7 +4,7 @@
  * @param {unknown} value - The value to check.
  * @returns {value is null | undefined} Whether or not the value is null or undefined.
  */
-export const isNil = value => 
+export const isNil = value =>
   value === null || typeof value === 'undefined'
 
 /**
@@ -108,6 +108,43 @@ export const isNonEmptyArray = value => isArray(value) && value.length > 0
  * @returns {value is HTMLElement} Whether or not the value is an HTMLElement
  */
 export const isHTMLElement = value => value instanceof HTMLElement
+
+/**
+ * Check if a value is a valid event target (HTMLElement, Document, or Window)
+ * @param {unknown} value
+ * @returns {value is EventTarget} Whether or not the value is a valid event target
+ */
+export const isEventTarget = value => {
+  if (!value || typeof value !== 'object') return false
+
+  if (value instanceof HTMLElement) return true
+
+  if (value === document ||
+    ('nodeType' in value && value.nodeType === 9 && 'addEventListener' in value && isFunction(value.addEventListener))) {
+    return true
+  }
+
+  if (value === window ||
+    ('window' in value && value.window === value && 'addEventListener' in value && isFunction(value.addEventListener))) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Check if a value is an array of valid event targets
+ * @param {unknown} value
+ * @returns {value is EventTarget[]} Whether or not the value is an array of valid event targets
+ */
+export const isEventTargetArray = value => isNonEmptyArray(value) && value.every(isEventTarget)
+
+/**
+ * Check if a value is an array of HTMLElements
+ * @param {unknown} value
+ * @returns {value is HTMLElement[]} Whether or not the value is an array of HTMLElements
+ */
+export const isHTMLElementArray = value => isNonEmptyArray(value) && value.every(isHTMLElement)
 
 /**
  * Check if a value is an object
