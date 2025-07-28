@@ -74,7 +74,9 @@ export const useEvents = (elementOrElements, eventMap, deps = []) => {
          * @param {Event} event
          */
         const handlerWithIndex = (event) => {
-          handler(event, index)
+          if (isFunction(handler)) {
+            handler(event, index)
+          }
         }
 
         element.addEventListener(eventName, handlerWithIndex)

@@ -3,6 +3,7 @@ import { useClasses } from '../hooks/useClasses.js'
 import { signal } from '../core/signal.js'
 import { withHookContext } from '../core/hookContext.js'
 import * as hookContext from '../core/hookContext.js'
+import { logger } from '../utils/logger.js'
 
 describe('useClasses', () => {
   let element
@@ -83,22 +84,21 @@ describe('useClasses', () => {
   })
 
   it('should gracefully handle null/undefined elements with warning', () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+    // @ts-ignore - Testing logger methods
+    const warnSpy = vi.spyOn(logger, 'info').mockImplementation(() => { })
 
     const cleanupNull = useClasses(null, { 'active': true })
-
     const cleanupUndefined = useClasses(undefined, { 'active': true })
 
-    expect(consoleSpy).toHaveBeenCalledTimes(2)
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('useClasses called with null/undefined element'))
+    expect(warnSpy).toHaveBeenCalledTimes(2)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('useClasses called with null/undefined element'))
 
     expect(typeof cleanupNull).toBe('function')
     expect(typeof cleanupUndefined).toBe('function')
-
     expect(() => cleanupNull()).not.toThrow()
     expect(() => cleanupUndefined()).not.toThrow()
 
-    consoleSpy.mockRestore()
+    warnSpy.mockRestore()
   })
 
   it('should throw an error if called with a non-HTMLElement', () => {
@@ -334,22 +334,22 @@ describe('useClasses', () => {
     })
 
     it('should handle null/undefined in array gracefully', () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+      // @ts-ignore - Testing logger methods
+      const warnSpy = vi.spyOn(logger, 'info').mockImplementation(() => { })
 
       const cleanupNull = useClasses(null, { 'active': true })
 
       const cleanupUndefined = useClasses(undefined, { 'active': true })
 
-      expect(consoleSpy).toHaveBeenCalledTimes(2)
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('useClasses called with null/undefined element'))
+      expect(warnSpy).toHaveBeenCalledTimes(2)
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('useClasses called with null/undefined element'))
 
       expect(typeof cleanupNull).toBe('function')
       expect(typeof cleanupUndefined).toBe('function')
-
       expect(() => cleanupNull()).not.toThrow()
       expect(() => cleanupUndefined()).not.toThrow()
 
-      consoleSpy.mockRestore()
+      warnSpy.mockRestore()
     })
 
     it('should throw error for invalid elements in array', () => {

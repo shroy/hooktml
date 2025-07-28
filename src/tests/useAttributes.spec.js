@@ -1,11 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useAttributes } from '../hooks/useAttributes.js'
 import { signal } from '../core/signal.js'
 import { withHookContext } from '../core/hookContext.js'
 import { isFunction } from '../utils/type-guards.js'
+import { logger } from '../utils/logger.js'
 
 describe('useAttributes', () => {
   let element
@@ -63,22 +64,21 @@ describe('useAttributes', () => {
   })
 
   it('should gracefully handle null/undefined elements with warning', () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+    // @ts-ignore - Testing logger methods
+    const warnSpy = vi.spyOn(logger, 'info').mockImplementation(() => { })
 
     const cleanupNull = useAttributes(null, { 'data-test': 'value' })
-
     const cleanupUndefined = useAttributes(undefined, { 'data-test': 'value' })
 
-    expect(consoleSpy).toHaveBeenCalledTimes(2)
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('useAttributes called with null/undefined element'))
+    expect(warnSpy).toHaveBeenCalledTimes(2)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('useAttributes called with null/undefined element'))
 
     expect(typeof cleanupNull).toBe('function')
     expect(typeof cleanupUndefined).toBe('function')
-
     expect(() => cleanupNull()).not.toThrow()
     expect(() => cleanupUndefined()).not.toThrow()
 
-    consoleSpy.mockRestore()
+    warnSpy.mockRestore()
   })
 
   it('should throw an error if first argument is not an HTMLElement', () => {
@@ -343,13 +343,14 @@ describe('useAttributes', () => {
     })
 
     it('should handle null/undefined in array gracefully', () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+      // @ts-ignore - Testing logger methods
+      const warnSpy = vi.spyOn(logger, 'info').mockImplementation(() => { })
 
       const cleanupNull = useAttributes(null, { 'data-test': 'test' })
       const cleanupUndefined = useAttributes(undefined, { 'data-test': 'test' })
 
-      expect(consoleSpy).toHaveBeenCalledTimes(2)
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('useAttributes called with null/undefined element'))
+      expect(warnSpy).toHaveBeenCalledTimes(2)
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('useAttributes called with null/undefined element'))
 
       expect(typeof cleanupNull).toBe('function')
       expect(typeof cleanupUndefined).toBe('function')
@@ -357,7 +358,7 @@ describe('useAttributes', () => {
       expect(() => cleanupNull()).not.toThrow()
       expect(() => cleanupUndefined()).not.toThrow()
 
-      consoleSpy.mockRestore()
+      warnSpy.mockRestore()
     })
 
     it('should throw error for invalid elements in array', () => {

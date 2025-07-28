@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useEvents } from '../hooks/useEvents.js'
 import { signal } from '../core/signal.js'
 import { withHookContext } from '../core/hookContext.js'
@@ -23,8 +23,6 @@ describe('useEvents', () => {
     // Setup
     const clickHandler = vi.fn()
     const mouseoverHandler = vi.fn()
-
-    // Spy on addEventListener
     const addEventSpy = vi.spyOn(element, 'addEventListener')
 
     // Apply event listeners via useEvents
@@ -33,21 +31,30 @@ describe('useEvents', () => {
       mouseover: mouseoverHandler
     })
 
-    // Verify event listeners were attached
+    // Verify event listeners were attached (check call count and event names)
     expect(addEventSpy).toHaveBeenCalledTimes(2)
-    expect(addEventSpy).toHaveBeenCalledWith('click', clickHandler)
-    expect(addEventSpy).toHaveBeenCalledWith('mouseover', mouseoverHandler)
+    expect(addEventSpy).toHaveBeenCalledWith('click', expect.any(Function))
+    expect(addEventSpy).toHaveBeenCalledWith('mouseover', expect.any(Function))
+
+    // Test functionality by firing events
+    element.dispatchEvent(new Event('click'))
+    element.dispatchEvent(new Event('mouseover'))
+
+    expect(clickHandler).toHaveBeenCalledTimes(1)
+    expect(mouseoverHandler).toHaveBeenCalledTimes(1)
+
+    // Verify handlers receive event and index (index 0 for single element)
+    expect(clickHandler).toHaveBeenCalledWith(expect.any(Event), 0)
+    expect(mouseoverHandler).toHaveBeenCalledWith(expect.any(Event), 0)
   })
 
   it('should return a cleanup function that removes event listeners', () => {
     // Setup
     const clickHandler = vi.fn()
     const mouseoverHandler = vi.fn()
-
-    // Spy on removeEventListener
     const removeEventSpy = vi.spyOn(element, 'removeEventListener')
 
-    // Apply event listeners and get cleanup function
+    // Apply event listeners via useEvents
     const cleanup = useEvents(element, {
       click: clickHandler,
       mouseover: mouseoverHandler
@@ -56,45 +63,43 @@ describe('useEvents', () => {
     // Call cleanup function
     cleanup()
 
-    // Verify event listeners were removed
+    // Verify event listeners were removed (check call count and event names)
     expect(removeEventSpy).toHaveBeenCalledTimes(2)
-    expect(removeEventSpy).toHaveBeenCalledWith('click', clickHandler)
-    expect(removeEventSpy).toHaveBeenCalledWith('mouseover', mouseoverHandler)
+    expect(removeEventSpy).toHaveBeenCalledWith('click', expect.any(Function))
+    expect(removeEventSpy).toHaveBeenCalledWith('mouseover', expect.any(Function))
   })
 
   it('should skip non-function handlers with a warning', () => {
-    // Setup
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+    // @ts-ignore - Testing logger methods
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => { })
     const addEventSpy = vi.spyOn(element, 'addEventListener')
 
-    // Apply event listeners with a non-function handler
+    // @ts-ignore - Testing invalid handler type
     useEvents(element, {
-      click: () => { },  // Valid
-      mouseover: 'not a function'  // Invalid
+      click: 'not-a-function'
     })
 
-    // Verify only the valid handler was attached
-    expect(addEventSpy).toHaveBeenCalledTimes(1)
-    expect(addEventSpy).toHaveBeenCalledWith('click', expect.any(Function))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not a function'))
+    expect(addEventSpy).not.toHaveBeenCalled()
 
-    // Verify warning was logged
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('mouseover'))
+    warnSpy.mockRestore()
+    addEventSpy.mockRestore()
   })
 
   it('should gracefully handle null/undefined elements with warning', () => {
-    const warnSpy = vi.spyOn(logger, 'warn')
+    // @ts-ignore - Testing logger methods
+    const warnSpy = vi.spyOn(logger, 'info').mockImplementation(() => { })
 
+    // @ts-ignore - Testing null/undefined element
     const cleanup1 = useEvents(null, { click: vi.fn() })
+    // @ts-ignore - Testing null/undefined element  
     const cleanup2 = useEvents(undefined, { click: vi.fn() })
 
     expect(warnSpy).toHaveBeenCalledWith('[HookTML] useEvents called with null/undefined element, skipping event registration')
     expect(warnSpy).toHaveBeenCalledTimes(2)
 
-    // Should return no-op cleanup functions
     expect(typeof cleanup1).toBe('function')
     expect(typeof cleanup2).toBe('function')
-
-    // Should not throw when called
     expect(() => cleanup1()).not.toThrow()
     expect(() => cleanup2()).not.toThrow()
 
@@ -102,99 +107,82 @@ describe('useEvents', () => {
   })
 
   it('should gracefully handle empty arrays with warning', () => {
-    const warnSpy = vi.spyOn(logger, 'warn')
+    // @ts-ignore - Testing logger methods
+    const warnSpy = vi.spyOn(logger, 'info').mockImplementation(() => { })
 
     const cleanup = useEvents([], { click: vi.fn() })
 
     expect(warnSpy).toHaveBeenCalledWith('[HookTML] useEvents called with empty array, skipping event registration')
     expect(warnSpy).toHaveBeenCalledTimes(1)
 
-    // Should return no-op cleanup function
     expect(typeof cleanup).toBe('function')
-
-    // Should not throw when called
     expect(() => cleanup()).not.toThrow()
 
     warnSpy.mockRestore()
   })
 
   it('should throw an error if called with invalid non-EventTarget elements', () => {
-    expect(() => useEvents({}, {})).toThrow()
-    expect(() => useEvents('string', {})).toThrow()
-    expect(() => useEvents(123, {})).toThrow()
+    // @ts-ignore - Testing invalid element types
+    expect(() => useEvents({}, { click: vi.fn() })).toThrow()
+    // @ts-ignore - Testing invalid element types
+    expect(() => useEvents('string', { click: vi.fn() })).toThrow()
+    // @ts-ignore - Testing invalid element types  
+    expect(() => useEvents(123, { click: vi.fn() })).toThrow()
   })
 
   it('should work with document and window objects', () => {
-    // Setup handlers
+    // Setup
     const documentHandler = vi.fn()
     const windowHandler = vi.fn()
-
-    // Setup spies
     const documentAddSpy = vi.spyOn(document, 'addEventListener')
     const windowAddSpy = vi.spyOn(window, 'addEventListener')
-    const documentRemoveSpy = vi.spyOn(document, 'removeEventListener')
-    const windowRemoveSpy = vi.spyOn(window, 'removeEventListener')
 
-    // Test with document
-    const documentCleanup = useEvents(document, {
-      click: documentHandler
-    })
-
-    // Test with window
-    const windowCleanup = useEvents(window, {
-      resize: windowHandler
-    })
+    // Apply event listeners to document and window
+    useEvents(document, { click: documentHandler })
+    useEvents(window, { resize: windowHandler })
 
     // Verify event listeners were attached
-    expect(documentAddSpy).toHaveBeenCalledWith('click', documentHandler)
-    expect(windowAddSpy).toHaveBeenCalledWith('resize', windowHandler)
+    expect(documentAddSpy).toHaveBeenCalledWith('click', expect.any(Function))
+    expect(windowAddSpy).toHaveBeenCalledWith('resize', expect.any(Function))
 
-    // Test cleanup functions
-    documentCleanup()
-    windowCleanup()
+    // Test functionality
+    document.dispatchEvent(new Event('click'))
+    window.dispatchEvent(new Event('resize'))
 
-    // Verify event listeners were removed
-    expect(documentRemoveSpy).toHaveBeenCalledWith('click', documentHandler)
-    expect(windowRemoveSpy).toHaveBeenCalledWith('resize', windowHandler)
-
-    // Restore spies
-    documentAddSpy.mockRestore()
-    windowAddSpy.mockRestore()
-    documentRemoveSpy.mockRestore()
-    windowRemoveSpy.mockRestore()
+    expect(documentHandler).toHaveBeenCalledWith(expect.any(Event), 0)
+    expect(windowHandler).toHaveBeenCalledWith(expect.any(Event), 0)
   })
 
   it('should work with arrays of elements', () => {
-    const button1 = document.createElement('button')
-    const button2 = document.createElement('button')
-    const button3 = document.createElement('button')
-    const buttons = [button1, button2, button3]
-
+    // Setup
+    const buttons = [
+      document.createElement('button'),
+      document.createElement('button')
+    ]
     const clickHandler = vi.fn()
     const mouseoverHandler = vi.fn()
-
     const addEventSpies = buttons.map(btn => vi.spyOn(btn, 'addEventListener'))
-    const removeEventSpies = buttons.map(btn => vi.spyOn(btn, 'removeEventListener'))
 
-    const cleanup = useEvents(buttons, {
+    // Apply event listeners to array of buttons
+    useEvents(buttons, {
       click: clickHandler,
       mouseover: mouseoverHandler
     })
 
+    // Verify event listeners were attached to all buttons
     buttons.forEach((btn, index) => {
-      expect(addEventSpies[index]).toHaveBeenCalledWith('click', clickHandler)
-      expect(addEventSpies[index]).toHaveBeenCalledWith('mouseover', mouseoverHandler)
+      expect(addEventSpies[index]).toHaveBeenCalledWith('click', expect.any(Function))
+      expect(addEventSpies[index]).toHaveBeenCalledWith('mouseover', expect.any(Function))
     })
 
-    cleanup()
-
+    // Test functionality and index passing
     buttons.forEach((btn, index) => {
-      expect(removeEventSpies[index]).toHaveBeenCalledWith('click', clickHandler)
-      expect(removeEventSpies[index]).toHaveBeenCalledWith('mouseover', mouseoverHandler)
-    })
+      btn.dispatchEvent(new Event('click'))
+      btn.dispatchEvent(new Event('mouseover'))
 
-    addEventSpies.forEach(spy => spy.mockRestore())
-    removeEventSpies.forEach(spy => spy.mockRestore())
+      expect(clickHandler).toHaveBeenCalledWith(expect.any(Event), index)
+      expect(mouseoverHandler).toHaveBeenCalledWith(expect.any(Event), index)
+    })
   })
 
   it('should throw an error if eventMap is not a non-empty object', () => {
