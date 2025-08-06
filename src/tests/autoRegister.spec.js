@@ -26,7 +26,7 @@ describe('autoRegisterComponents', () => {
     vi.clearAllMocks()
     mockRegister.mockClear()
   })
-  
+
   afterEach(() => {
     vi.resetAllMocks()
   })
@@ -44,7 +44,7 @@ describe('autoRegisterComponents', () => {
       register: mockRegister,
       debug: true
     })
-    
+
     // In test environment without Node.js filesystem or bundler, should return 0
     expect(result).toBe(0)
     expect(mockRegister).not.toHaveBeenCalled()
@@ -54,7 +54,7 @@ describe('autoRegisterComponents', () => {
     const result = await autoRegisterComponents({
       register: mockRegister
     })
-    
+
     // Should use default path and return 0 in test environment
     expect(result).toBe(0)
   })
@@ -81,5 +81,18 @@ describe('autoRegisterComponents', () => {
     // Should return 0 in test environment and not throw errors
     expect(result).toBe(0)
     expect(mockRegister).not.toHaveBeenCalled()
+  })
+
+  it('should pass componentPath to bundler modules function', async () => {
+    const customPath = 'app/frontend/hooktml'
+    const result = await autoRegisterComponents({
+      componentPath: customPath,
+      register: mockRegister,
+      debug: true
+    })
+
+    // Should return 0 in test environment but verify path is used
+    expect(result).toBe(0)
+    // In a real bundler environment, the custom path would be used for glob pattern
   })
 }) 

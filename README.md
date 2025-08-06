@@ -164,7 +164,7 @@ HookTML.start({
 });
 ```
 
-**Note**: The `componentPath` option only works in Node.js environments (SSR, build scripts). For browser environments, manually register components using `HookTML.registerComponent()`.
+**Note**: The `componentPath` option works in Node.js environments. For bundler environments, it requires static analysis support.
 
 The `attributePrefix` option allows you to namespace all HookTML attributes. When set, all hooks, components, and props will be prefixed with the specified value. For example, with `attributePrefix: "data"`:
 
@@ -469,13 +469,11 @@ HookTML.start({
 
 **Auto-registration Environment Support:**
 
-HookTML's auto-registration feature works differently depending on your environment:
+- **Node.js environments**: Auto-registers all components in the specified directory
+- **Bundler environments**: Limited due to static analysis requirements - manual registration recommended
+- **Browser environments**: Manual registration required
 
-- **Node.js environments** (server-side, build scripts): Uses filesystem scanning to find and register components automatically
-- **Bundler environments** (Vite, Webpack with glob support): Uses bundler-provided glob imports for component discovery
-- **Browser environments** (without bundler features): Falls back gracefully, requiring manual component registration
-
-This conditional approach ensures HookTML remains zero-dependency while providing convenience when bundler features are available. If auto-registration isn't supported in your environment, simply register components manually using `registerComponent()`.
+If auto-registration isn't available, use `registerComponent()` to register components manually.
 
 ### Accessing Children Elements
 
