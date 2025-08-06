@@ -101,3 +101,24 @@ export {
   computed,
   getConfig
 }
+
+// Default export - object with all functions
+const HookTML = {
+  start,
+  scan,
+  registerComponent,
+  registerHook,
+  registerChainableHook,
+  useEffect,
+  useChildren,
+  useEvents,
+  useClasses,
+  useAttributes,
+  useStyles,
+  with: withEl,
+  signal,
+  computed,
+  getConfig
+}
+
+export default HookTML
