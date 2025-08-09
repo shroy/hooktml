@@ -19,6 +19,12 @@ HookTML is a JavaScript library that lets you add interactive behavior to HTML w
 - 🧹 **Automatic cleanup** - No manual lifecycle management
 - 🚀 **Progressive enhancement** - Perfect for server-rendered apps
 
+## 📖 Learn More
+
+**[Why I Built HookTML: React Vibes, Stimulus Roots](https://dev.to/shroy/why-i-built-hooktml-react-vibes-stimulus-roots-3dde)** 📝
+
+Read the story behind HookTML's creation: from the context-switching struggles between React and Stimulus, to building a library that bridges functional composition with HTML-first development.
+
 ## 🚀 Try It Live
 
 See HookTML in action with these interactive examples:
