@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-01-27
+
+### Added
+- **`useText` Hook**: New utility hook for declarative text content updates
+  - `useText(element, textFunction, deps?)` - Set text content reactively with dependencies
+  - Function receives element and returns text to display
+  - Supports React-like useEffect behavior - runs on mount and when dependencies change
+  - Integrated with chainable `with()` API for fluent composition
+  - Comprehensive validation with graceful error handling
+
+### Enhanced
+- **Documentation**: Updated README with `useText` examples throughout
+  - Replaced manual `textContent` assignments with cleaner `useText` calls
+  - Added to API reference and declarative content hooks sections
+  - Updated Quick Example and Advanced Patterns sections
+
+### Technical
+- Added comprehensive test suite with 17 passing tests
+- Exported from main package and utility hooks index
+- Follows existing hook patterns for consistency
+
 ## [0.4.2] - 2025-01-27
 
 ### Fixed

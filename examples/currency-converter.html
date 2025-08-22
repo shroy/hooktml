@@ -148,9 +148,9 @@
       });
 
       // Update display when conversion changes
-      HookTML.useEffect(() => {
-        result.textContent = `${convertedAmount.value} ${toCurrency.value}`;
-      }, [convertedAmount, toCurrency]);
+      HookTML.useText(result, () =>
+        `${convertedAmount.value} ${toCurrency.value}`,
+        [convertedAmount, toCurrency]);
 
       // Listen to input changes
       HookTML.useEvents(amount, {

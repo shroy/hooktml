@@ -10,6 +10,7 @@ export {
   useClasses,
   useAttributes,
   useStyles,
+  useText,
   with,
   signal,
   computed,

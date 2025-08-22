@@ -10,6 +10,7 @@ import { useEvents } from './src/hooks/useEvents.js'
 import { useClasses } from './src/hooks/useClasses.js'
 import { useAttributes } from './src/hooks/useAttributes.js'
 import { useStyles } from './src/hooks/useStyles.js'
+import { useText } from './src/hooks/useText.js'
 import { with as withEl } from './src/core/with.js'
 import { createObserver } from './src/core/observer.js'
 import { scanComponents, initializeComponents } from './src/core/scanComponents.js'
@@ -96,6 +97,7 @@ export {
   useClasses,
   useAttributes,
   useStyles,
+  useText,
   withEl as with,
   signal,
   computed,
@@ -115,6 +117,7 @@ const HookTML = {
   useClasses,
   useAttributes,
   useStyles,
+  useText,
   with: withEl,
   signal,
   computed,

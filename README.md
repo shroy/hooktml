@@ -52,15 +52,13 @@ See HookTML in action with these interactive examples:
 ```
 
 ```js
-import { signal, useEffect, useEvents } from 'hooktml';
+import { signal, useText, useEvents } from 'hooktml';
 
 export const Counter = (el, props) => {
   const { increment, display } = props.children;
   const count = signal(0);
 
-  useEffect(() => {
-    display.textContent = `${count.value}`;
-  }, [count]);
+  useText(display, () => `${count.value}`, [count]);
 
   useEvents(increment, {
     click: () => {
@@ -124,16 +122,14 @@ You can also download and host the file locally:
 <script src="./js/hooktml.min.js"></script>
 <script>
   // Destructure what you need from HookTML
-  const { start, signal, useEffect, registerComponent, useEvents } = HookTML;
+  const { start, signal, useText, registerComponent, useEvents } = HookTML;
   
   // Register a custom component
   function MyCounter(el, props) {
     const { increment, display } = props.children;
     const count = signal(0);
     
-    useEffect(() => {
-      display.textContent = count.value;
-    }, [count]);
+    useText(display, () => count.value, [count]);
     
     useEvents(increment, {
       click: () => count.value = count.value + 1
@@ -648,11 +644,14 @@ el.setAttribute("button-loading", "");
 
 This is easier to debug in DevTools and avoids class name drift.
 
-### Declarative Styling Hooks
+### Declarative Content Hooks
 
-HookTML also provides specialized hooks for applying styles declaratively in your JavaScript:
+HookTML provides specialized hooks for updating content and styles declaratively in your JavaScript:
 
 ```js
+// Set text content reactively
+useText(span, () => `Count: ${count.value}`, [count]);
+
 // Apply classes conditionally
 useClasses(button, {
   'is-active': isActive,
@@ -674,7 +673,7 @@ useAttributes(toggle, {
 
 #### Array Support
 
-All styling hooks support arrays of elements with per-element logic using functions that receive both the element and its index:
+Most utility hooks support arrays of elements with per-element logic using functions that receive both the element and its index:
 
 ```js
 // Direct signal values are automatically tracked (no deps needed)
@@ -764,6 +763,7 @@ The `data-hooktml-cloak` attribute is removed automatically once behavior is rea
 | `useStyles(el, styleObject, deps?)` | Apply inline styles. Supports arrays with per-element functions |
 | `useAttributes(el, attrMap, deps?)` | Set DOM attributes. Supports arrays with per-element functions |
 | `useClasses(el, classMap, deps?)` | Toggle class names based on conditions. Supports arrays with per-element functions |
+| `useText(el, textFunction, deps?)` | Set text content on an element. Function receives element and returns text to display |
 | `useChildren(el, prefix)` | Query child elements with a specific prefix, returning both singular and plural keys for consistent access |
 
 ### Component Return Values
@@ -790,6 +790,7 @@ with(el)
   .useEvents({ click: onClick })
   .useClasses({ active: isActive })
   .useAttributes({ "aria-expanded": isOpen })
+  .useText(() => `Hello ${firstName}`)
   .cleanup();
 ```
 
@@ -873,6 +874,12 @@ useEffect(() => {
 }, [count]);
 ```
 
+Or use the more declarative `useText()` hook:
+
+```js
+useText(display, () => `${count.value}`, [count]);
+```
+
 This callback runs anytime `count.value` changes, without re-rendering the component.
 
 #### Why Signals Instead of useState
@@ -903,9 +910,7 @@ const completionPercentage = computed(() => {
 });
 
 // Use computed signals just like regular signals
-useEffect(() => {
-  statusEl.textContent = `${completedTodos.value}/${totalTodos.value} (${completionPercentage.value}%)`;
-}, [completionPercentage]);
+useText(statusEl, () => `${completedTodos.value}/${totalTodos.value} (${completionPercentage.value}%)`, [completionPercentage]);
 ```
 
 #### Benefits of Computed Signals
@@ -956,11 +961,9 @@ export const TodoStats = (el, props) => {
   const { total, completed, percentage } = props.children;
   
   // Computed signals eliminate manual state synchronization
-  useEffect(() => {
-    total.textContent = totalTodos.value;
-    completed.textContent = completedTodos.value;
-    percentage.textContent = `${completionPercentage.value}%`;
-  }, [totalTodos, completedTodos, completionPercentage]);
+  useText(total, () => totalTodos.value, [totalTodos]);
+  useText(completed, () => completedTodos.value, [completedTodos]);
+  useText(percentage, () => `${completionPercentage.value}%`, [completionPercentage]);
 };
 ```
 

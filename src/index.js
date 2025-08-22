@@ -10,6 +10,7 @@ import { useEvents } from './hooks/useEvents.js'
 import { useClasses } from './hooks/useClasses.js'
 import { useAttributes } from './hooks/useAttributes.js'
 import { useStyles } from './hooks/useStyles.js'
+import { useText } from './hooks/useText.js'
 import { with as withEl } from './core/with.js'
 import { createObserver } from './core/observer.js'
 import { scanComponents, initializeComponents } from './core/scanComponents.js'
@@ -112,6 +113,7 @@ export {
   useClasses,
   useAttributes,
   useStyles,
+  useText,
   withEl as with,
   signal,
   computed
