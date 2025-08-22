@@ -8,6 +8,7 @@ import { useEvents } from '../hooks/useEvents.js'
 import { useClasses } from '../hooks/useClasses.js'
 import { useAttributes } from '../hooks/useAttributes.js'
 import { useStyles } from '../hooks/useStyles.js'
+import { useText } from '../hooks/useText.js'
 import { getRegisteredChainableHooks } from './hookRegistry.js'
 
 /**
@@ -16,6 +17,7 @@ import { getRegisteredChainableHooks } from './hookRegistry.js'
  * @property {(classMap: Record<string, boolean>) => WithChain} useClasses
  * @property {(attrMap: Record<string, string|null>) => WithChain} useAttributes
  * @property {(styleMap: Partial<CSSStyleDeclaration>) => WithChain} useStyles
+ * @property {(textFunction: () => string) => WithChain} useText
  */
 
 /**
@@ -49,7 +51,7 @@ const with_ = (element) => {
       useClasses(element, classMap)
       return chain
     },
-    
+
     /**
      * Set HTML attributes on the element
      * @param {Record<string, string|null>} attrMap - Object mapping attribute names to values
@@ -59,7 +61,7 @@ const with_ = (element) => {
       useAttributes(element, attrMap)
       return chain
     },
-    
+
     /**
      * Apply inline styles to the element
      * @param {Partial<CSSStyleDeclaration>} styleMap - Object mapping style properties to values
@@ -68,12 +70,22 @@ const with_ = (element) => {
     useStyles: (styleMap) => {
       useStyles(element, styleMap)
       return chain
+    },
+
+    /**
+     * Set text content on the element
+     * @param {() => string} textFunction - Function that returns the text content to set
+     * @returns {WithChain} The chainable object for further operations
+     */
+    useText: (textFunction) => {
+      useText(element, textFunction)
+      return chain
     }
   }
-  
+
   // Add methods for all registered chainable hooks
   const registeredChainableHooks = getRegisteredChainableHooks()
-  
+
   registeredChainableHooks.forEach((hookFn, hookName) => {
     if (isFunction(hookFn) && !chain[hookName]) {
       // Add the hook as a method on the chain object
