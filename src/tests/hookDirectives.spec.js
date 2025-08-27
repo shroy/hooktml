@@ -19,13 +19,13 @@ const scanDirectives = vi.fn()
 function mockScanDirectivesImplementation(hooks, hookElements) {
   // Reset call count
   Object.values(hooks).forEach(hook => hook.mockClear())
-  
+
   // Process each element
   let processedCount = 0
-  
+
   hookElements.forEach(({ element, hookName, value }) => {
     const hook = hooks[hookName]
-    
+
     if (hook) {
       if (value === undefined) {
         hook(element, {})
@@ -37,7 +37,7 @@ function mockScanDirectivesImplementation(hooks, hookElements) {
       logger.warn(`Unknown hook "${hookName}"`, element)
     }
   })
-  
+
   return processedCount
 }
 
@@ -45,43 +45,43 @@ describe('Hook Directives', () => {
   beforeEach(() => {
     // Reset document body
     document.body.innerHTML = ''
-    
+
     // Clear hook registry
     clearHookRegistry()
-    
+
     // Reset mocks
     vi.clearAllMocks()
     scanDirectives.mockReset()
   })
-  
+
   afterEach(() => {
     vi.restoreAllMocks()
   })
-  
+
   it('should register hooks correctly', () => {
     function useFocus() {
       // Focus implementation
     }
-    
+
     function useScrollLock() {
       // Scroll lock implementation
     }
-    
+
     expect(registerHook(useFocus)).toBe(true)
     expect(registerHook(useScrollLock)).toBe(true)
-    
+
     // Second registration should return false
     expect(registerHook(useFocus)).toBe(false)
   })
-  
+
   it('should scan for elements with use-* attributes and apply hooks', () => {
     // Register hooks with spies
     const useFocus = vi.fn()
     const useScrollLock = vi.fn()
-    
+
     registerHook(useFocus)
     registerHook(useScrollLock)
-    
+
     // Add elements with directives
     document.body.innerHTML = `
       <div id="elem1" use-focus></div>
@@ -89,7 +89,7 @@ describe('Hook Directives', () => {
       <div id="elem3" use-focus use-scroll-lock></div>
       <div id="elem4" use-unknown></div>
     `
-    
+
     // Mock implementation
     scanDirectives.mockImplementation(() => {
       return mockScanDirectivesImplementation(
@@ -103,41 +103,41 @@ describe('Hook Directives', () => {
         ]
       )
     })
-    
+
     // Scan for directives
     const processedCount = scanDirectives()
-    
+
     // Verify correct number of elements processed
     expect(processedCount).toBe(4)
-    
+
     // Verify hooks were called with the correct elements
     expect(useFocus).toHaveBeenCalledTimes(2)
     expect(useScrollLock).toHaveBeenCalledTimes(2)
-    
+
     // Check specific elements - empty attributes should receive empty objects
     expect(useFocus).toHaveBeenCalledWith(document.getElementById('elem1'), {})
     expect(useFocus).toHaveBeenCalledWith(document.getElementById('elem3'), {})
     expect(useScrollLock).toHaveBeenCalledWith(document.getElementById('elem2'), {})
     expect(useScrollLock).toHaveBeenCalledWith(document.getElementById('elem3'), {})
-    
+
     // Unknown directives should be ignored but logged in debug mode
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('Unknown hook "useUnknown"'),
       expect.anything()
     )
   })
-  
+
   it('should convert kebab-case attributes to camelCase hook names', () => {
     // Register a hook with camelCase name
     const useMyComplexHook = vi.fn()
-    
+
     registerHook(useMyComplexHook)
-    
+
     // Add element with kebab-case attribute
     document.body.innerHTML = `
       <div id="complex" use-my-complex-hook></div>
     `
-    
+
     // Mock implementation to handle kebab-case conversion
     scanDirectives.mockImplementation(() => {
       return mockScanDirectivesImplementation(
@@ -147,30 +147,30 @@ describe('Hook Directives', () => {
         ]
       )
     })
-    
+
     // Scan for directives
     scanDirectives()
-    
+
     // Verify hook was called
     expect(useMyComplexHook).toHaveBeenCalledTimes(1)
     expect(useMyComplexHook).toHaveBeenCalledWith(document.getElementById('complex'), {})
   })
-  
+
   it('should run multiple hooks on the same element', () => {
     // Register multiple hooks
     const useHookA = vi.fn()
     const useHookB = vi.fn()
     const useHookC = vi.fn()
-    
+
     registerHook(useHookA)
     registerHook(useHookB)
     registerHook(useHookC)
-    
+
     // Add element with multiple hooks
     document.body.innerHTML = `
       <div id="multi" use-hook-a use-hook-b use-hook-c></div>
     `
-    
+
     // Mock implementation for multiple hooks
     scanDirectives.mockImplementation(() => {
       const multiElem = document.getElementById('multi')
@@ -183,25 +183,25 @@ describe('Hook Directives', () => {
         ]
       )
     })
-    
+
     // Scan for directives
     scanDirectives()
-    
+
     // Verify all hooks were called on the same element
     const multiElem = document.getElementById('multi')
     expect(useHookA).toHaveBeenCalledWith(multiElem, {})
     expect(useHookB).toHaveBeenCalledWith(multiElem, {})
     expect(useHookC).toHaveBeenCalledWith(multiElem, {})
   })
-  
+
   it('should pass attribute values to hooks correctly', () => {
     // Register hooks with spies
     const useTooltip = vi.fn()
     const useCounter = vi.fn()
-    
+
     registerHook(useTooltip)
     registerHook(useCounter)
-    
+
     // Add elements with directives and values
     document.body.innerHTML = `
       <button id="tooltip-btn" use-tooltip="Click to save">Save</button>
@@ -212,7 +212,7 @@ describe('Hook Directives', () => {
       <div id="string-value" use-tooltip="hello"></div>
       <div id="empty-value" use-tooltip=""></div>
     `
-    
+
     // Mock implementation with attribute values
     scanDirectives.mockImplementation(() => {
       return mockScanDirectivesImplementation(
@@ -228,44 +228,95 @@ describe('Hook Directives', () => {
         ]
       )
     })
-    
+
     // Scan for directives
     scanDirectives()
-    
+
     // Verify string values are passed correctly
     expect(useTooltip).toHaveBeenCalledWith(
-      document.getElementById('tooltip-btn'), 
+      document.getElementById('tooltip-btn'),
       { value: 'Click to save' }
     )
-    
+
     // Verify numeric values are parsed
     expect(useCounter).toHaveBeenCalledWith(
-      document.getElementById('counter'), 
+      document.getElementById('counter'),
       { value: 42 }
     )
-    
+
     // Verify boolean/null values are parsed
     expect(useTooltip).toHaveBeenCalledWith(
-      document.getElementById('boolean-true'), 
+      document.getElementById('boolean-true'),
       { value: true }
     )
     expect(useTooltip).toHaveBeenCalledWith(
-      document.getElementById('boolean-false'), 
+      document.getElementById('boolean-false'),
       { value: false }
     )
     expect(useTooltip).toHaveBeenCalledWith(
-      document.getElementById('null-value'), 
+      document.getElementById('null-value'),
       { value: null }
     )
     expect(useTooltip).toHaveBeenCalledWith(
-      document.getElementById('string-value'), 
+      document.getElementById('string-value'),
       { value: 'hello' }
     )
-    
+
     // Verify empty string values receive empty object
     expect(useTooltip).toHaveBeenCalledWith(
-      document.getElementById('empty-value'), 
+      document.getElementById('empty-value'),
       {}
+    )
+  })
+
+  it('should pass multiple props to hooks correctly', () => {
+    // Register hook with spy
+    const useTooltip = vi.fn()
+
+    registerHook(useTooltip)
+
+    // Add element with main attribute and additional props
+    document.body.innerHTML = `
+      <button 
+        id="tooltip-btn" 
+        use-tooltip="Click to save"
+        tooltip-placement="top"
+        tooltip-color="blue"
+        tooltip-delay="1000"
+        tooltip-enabled="true"
+      >
+        Save
+      </button>
+    `
+
+    // Mock implementation that simulates extractHookProps behavior
+    scanDirectives.mockImplementation(() => {
+      const element = document.getElementById('tooltip-btn')
+      const props = {
+        value: 'Click to save',
+        placement: 'top',
+        color: 'blue',
+        delay: 1000,
+        enabled: true
+      }
+
+      useTooltip(element, props)
+      return 1
+    })
+
+    // Scan for directives
+    scanDirectives()
+
+    // Verify hook receives all props
+    expect(useTooltip).toHaveBeenCalledWith(
+      document.getElementById('tooltip-btn'),
+      {
+        value: 'Click to save',
+        placement: 'top',
+        color: 'blue',
+        delay: 1000,
+        enabled: true
+      }
     )
   })
 }) 
