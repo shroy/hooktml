@@ -1,6 +1,6 @@
-import { isNumeric } from './type-guards.js'
+import { isNumeric, isNonEmptyString } from './type-guards.js'
 import { extractChildren } from './children.js'
-import { kebabToCamel } from './strings.js'
+import { kebabToCamel, camelToKebab } from './strings.js'
 import { getConfig } from '../core/config.js'
 
 /**
@@ -40,6 +40,41 @@ export const extractProps = (element, componentName) => {
   if (Object.keys(children).length > 0) {
     props.children = children
   }
+
+  return props
+}
+
+/**
+ * Extracts props from an element's attributes for a specific hook
+ * @param {HTMLElement} element - The DOM element
+ * @param {string} hookName - The camelCase hook name (e.g., 'useTooltip')
+ * @param {string} mainValue - The value from the main use-* attribute
+ * @returns {Record<string, any>} The extracted props
+ */
+export const extractHookProps = (element, hookName, mainValue) => {
+  const { formattedPrefix } = getConfig()
+
+  // Convert hook name to the prefix pattern
+  // useTooltip -> tooltip-
+  const hookPrefix = hookName.startsWith('use')
+    ? camelToKebab(hookName.slice(3)) // Remove 'use' prefix
+    : camelToKebab(hookName)
+
+  const prefix = `${formattedPrefix}${hookPrefix}-`
+  const props = {}
+
+  // Add main value if provided (from use-* attribute)
+  if (isNonEmptyString(mainValue)) {
+    props.value = coerceValue(mainValue)
+  }
+
+  // Extract additional props (e.g., tooltip-placement, tooltip-color)
+  Array.from(element.attributes).forEach(({ name, value }) => {
+    if (name.startsWith(prefix)) {
+      const propName = kebabToCamel(name.slice(prefix.length))
+      props[propName] = coerceValue(value)
+    }
+  })
 
   return props
 } 
