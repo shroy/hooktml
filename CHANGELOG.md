@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.1] - 2025-01-27
+## [0.5.2] - 2025-09-14
+
+### Fixed
+
+- **DOM Observer Root**: Fixed DOM observer to attach to `document.documentElement` instead of `document.body`
+  - Resolves compatibility issues with libraries like Turbo that replace the body element on page navigation
+  - Ensures HookTML components and hooks remain active after body replacement operations
+  - Maintains full functionality during SPA-style page transitions
+
+## [0.5.1] - 2025-08-26
 
 ### Fixed
 
@@ -22,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added comprehensive test coverage with 6 new unit tests and 1 integration test
 - All 316 tests continue to pass
 
-## [0.5.0] - 2025-01-27
+## [0.5.0] - 2025-08-24
 
 ### Added
 
@@ -46,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exported from main package and utility hooks index
 - Follows existing hook patterns for consistency
 
-## [0.4.2] - 2025-01-27
+## [0.4.2] - 2025-08-05
 
 ### Fixed
 
