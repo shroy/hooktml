@@ -49,7 +49,7 @@ const processMutation = (state, mutation) => {
         .filter(isHTMLElement)
       return [element, ...descendants]
     })
-    
+
   // Clean up removed elements
   removedElements.forEach(element => {
     if (state.elements.has(element)) {
@@ -193,22 +193,22 @@ const createHookTMLDelegate = () => {
     const hooks = getRegisteredHooks()
     const hookNames = Array.from(hooks.keys())
     const componentNames = getRegisteredComponentNames()
-    
+
     // Create selectors for hooks and components
     const selectors = []
-    
+
     if (isNonEmptyArray(hookNames)) {
       selectors.push(createHookSelector(hookNames, formattedPrefix))
     }
-    
+
     if (isNonEmptyArray(componentNames)) {
       selectors.push(createComponentSelector(componentNames, formattedPrefix))
     }
-    
+
     if (isEmptyArray(selectors)) {
       return []
     }
-    
+
     // Find all matching elements
     return Array.from(root.querySelectorAll(selectors.join(', ')))
       .filter(isHTMLElement)
@@ -225,14 +225,14 @@ const createHookTMLDelegate = () => {
         const { formattedPrefix } = getConfig()
         const hooks = getRegisteredHooks()
         const hookNames = Array.from(hooks.keys())
-        
+
         if (isNonEmptyArray(hookNames)) {
           const hookSelector = createHookSelector(hookNames, formattedPrefix)
           if (element.matches(hookSelector)) {
             processElementHooks(element)
           }
         }
-        
+
         // Process components
         const componentNames = getRegisteredComponentNames()
         if (isNonEmptyArray(componentNames)) {
@@ -274,24 +274,24 @@ const createHookTMLDelegate = () => {
 
   return { matchElements, addElement, removeElement }
 }
-  
+
 /**
  * Creates a DOM observer for HookTML
  * @returns {Object} Observer instance with start/stop methods
  */
 export const createObserver = () => {
   const delegate = createHookTMLDelegate()
-  const elementObserver = createElementObserver(document.body, delegate)
-  
+  const elementObserver = createElementObserver(document.documentElement, delegate)
+
   const start = () => {
     elementObserver.start()
     logger.log('DOM observation started')
   }
-  
+
   const stop = () => {
     elementObserver.stop()
     logger.log('DOM Observer stopped')
   }
-  
+
   return { start, stop }
 } 
