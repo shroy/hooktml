@@ -1,4 +1,4 @@
-import { kebabToCamel, pluralize } from './strings.js'
+import { kebabToCamel, pluralize, camelToKebab } from './strings.js'
 import { isArray, isHTMLElement } from './type-guards.js'
 import { getConfig } from '../core/config.js'
 
@@ -10,7 +10,7 @@ import { getConfig } from '../core/config.js'
  */
 export const hasSameComponent = (element, componentName) => {
   const { formattedPrefix } = getConfig()
-  return element.classList.contains(componentName) || 
+  return element.classList.contains(componentName) ||
     (isHTMLElement(element) && (
       element.getAttribute(`${formattedPrefix}use-component`) === componentName
     ))
@@ -24,7 +24,7 @@ export const hasSameComponent = (element, componentName) => {
  */
 export const addPluralizedChild = (children, key, child) => {
   const pluralKey = pluralize(key)
-  
+
   if (pluralKey in children) {
     // If the pluralized key already exists, just push the new child
     if (isArray(children[pluralKey])) {
@@ -44,13 +44,13 @@ export const addPluralizedChild = (children, key, child) => {
  */
 export const extractChildren = (element, componentName) => {
   const { formattedPrefix } = getConfig()
-  const prefix = `${formattedPrefix}${componentName.toLowerCase()}-`
+  const prefix = `${formattedPrefix}${camelToKebab(componentName)}-`
   /** @type {Record<string, Element | Element[]>} */
   const children = {}
 
   // Get all descendants
   const descendants = Array.from(element.getElementsByTagName('*'))
-  
+
   // Use some to short-circuit when the component is found
   descendants.some((child) => {
     if (hasSameComponent(child, componentName)) {

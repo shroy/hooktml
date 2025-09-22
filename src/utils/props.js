@@ -24,7 +24,7 @@ export const coerceValue = (value) => {
  */
 export const extractProps = (element, componentName) => {
   const { formattedPrefix } = getConfig()
-  const prefix = `${formattedPrefix}${componentName.toLowerCase()}-`
+  const prefix = `${formattedPrefix}${camelToKebab(componentName)}-`
   const props = {}
 
   // Extract regular props

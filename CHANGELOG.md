@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2025-09-21
+
+### Fixed
+
+- **Multi-word Component Names**: Fixed children prop extraction to use kebab-case for multi-word component names
+  - Components like `SearchForm` now correctly expect `search-form-input` instead of `searchform-input`
+  - Children attributes now properly convert PascalCase component names to kebab-case
+  - Maintains backward compatibility with single-word component names
+
 ## [0.5.2] - 2025-09-14
 
 ### Fixed
