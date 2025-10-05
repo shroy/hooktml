@@ -56,7 +56,30 @@ const processMutation = (state, mutation) => {
       state.delegate.removeElement(element)
       state.elements.delete(element)
     }
+
+    const cleanups = childrenCleanup.get(element)
+    if (cleanups) {
+      cleanups.forEach(cleanup => cleanup())
+      childrenCleanup.delete(element)
+    }
   })
+
+  // Collect all affected elements for children watchers
+  const addedNodes = mutation.addedNodes || []
+  const addedElements = Array.from(addedNodes)
+    .filter(node => isHTMLElement(node) && isElementNode(node))
+    .flatMap(node => {
+      const element = /** @type {HTMLElement} */ (node)
+      const descendants = Array.from(element.getElementsByTagName('*'))
+        .filter(isHTMLElement)
+      return [element, ...descendants]
+    })
+
+  // Trigger children watchers for all affected elements
+  const affectedElements = [...removedElements, ...addedElements]
+  if (isNonEmptyArray(affectedElements)) {
+    triggerChildrenWatchers(affectedElements)
+  }
 
   // Refresh to handle added nodes and attribute changes
   refresh(state)
@@ -273,6 +296,64 @@ const createHookTMLDelegate = () => {
   }
 
   return { matchElements, addElement, removeElement }
+}
+
+/**
+ * @typedef {Object} ChildrenWatcher
+ * @property {HTMLElement} element - The element being watched
+ * @property {string} prefix - The prefix for child elements
+ * @property {() => void} callback - Callback to execute when children change
+ */
+
+/** @type {Set<ChildrenWatcher>} */
+const childrenWatchers = new Set()
+
+/** @type {WeakMap<HTMLElement, (() => void)[]>} */
+const childrenCleanup = new WeakMap()
+
+/**
+ * Registers a watcher for children changes on an element
+ * @param {HTMLElement} element - The element to watch
+ * @param {string} prefix - The prefix for child elements
+ * @param {() => void} callback - Callback to execute when children change
+ */
+export const registerChildrenWatcher = (element, prefix, callback) => {
+  const watcher = { element, prefix, callback }
+  childrenWatchers.add(watcher)
+
+  const cleanup = () => {
+    childrenWatchers.delete(watcher)
+  }
+
+  const cleanups = childrenCleanup.get(element) || []
+  childrenCleanup.set(element, [...cleanups, cleanup])
+}
+
+/**
+ * Triggers children watchers for elements that may have changed
+ * @param {HTMLElement[]} elements - Elements that may have changed
+ */
+const triggerChildrenWatchers = (elements) => {
+  const triggeredWatchers = new Set()
+
+  elements.forEach(element => {
+    childrenWatchers.forEach(watcher => {
+      // Check if this element is a descendant of or is the watched element
+      if (watcher.element === element || (watcher.element.isConnected && watcher.element.contains(element))) {
+        if (!triggeredWatchers.has(watcher)) {
+          triggeredWatchers.add(watcher)
+          tryCatch({
+            fn: watcher.callback,
+            onError: (error) => {
+              if (getConfig().debug) {
+                logger.error('Error in children watcher callback:', error)
+              }
+            }
+          })
+        }
+      }
+    })
+  })
 }
 
 /**

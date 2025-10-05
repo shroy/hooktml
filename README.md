@@ -764,7 +764,7 @@ The `data-hooktml-cloak` attribute is removed automatically once behavior is rea
 | `useAttributes(el, attrMap, deps?)` | Set DOM attributes. Supports arrays with per-element functions |
 | `useClasses(el, classMap, deps?)` | Toggle class names based on conditions. Supports arrays with per-element functions |
 | `useText(el, textFunction, deps?)` | Set text content on an element. Function receives element and returns text to display |
-| `useChildren(el, prefix)` | Query child elements with a specific prefix, returning both singular and plural keys for consistent access |
+| `useChildren(el, prefix, config?)`  | Query child elements with a specific prefix, returning both singular and plural keys for consistent access. Optional config supports reactive signals
 
 ### Component Return Values
 
@@ -1032,6 +1032,54 @@ tabs.forEach((tab, index) => {
 ```
 
 This consistent API eliminates the need for conditional checks and lets you choose the most appropriate access pattern for your use case.
+
+### Reactive Children with Signals
+
+For dynamic UIs where child elements may be added or removed, `useChildren` supports selective reactivity through signals:
+
+```js
+export const DynamicList = (el, props) => {
+  // Make 'item' properties reactive - they'll update when DOM changes
+  const children = useChildren(el, "list", { signals: ["item"] });
+
+  // Access reactive values via .value
+  const items = children.items.value; // HTMLElement[]
+  const firstItem = children.item.value; // HTMLElement
+
+  // React to changes when items are added/removed
+  useEffect(() => {
+    console.log(`Now have ${items.length} items`);
+  }, [children.items]); // Reactive signal as dependency
+};
+```
+
+```html
+<div class="DynamicList">
+  <div list-item>Item 1</div>
+  <div list-item>Item 2</div>
+  <!-- Items can be added/removed dynamically -->
+</div>
+```
+
+Only specify the child properties you need to be reactive for optimal performance:
+
+```js
+const children = useChildren(el, "form", {
+  signals: ["input", "button"], // Only these become reactive
+});
+
+// Reactive properties (update when DOM changes)
+children.input.value; // Signal<HTMLElement>
+children.inputs.value; // Signal<HTMLElement[]>
+children.button.value; // Signal<HTMLElement>
+children.buttons.value; // Signal<HTMLElement[]>
+
+// Static properties (unchanged from original behavior)
+children.label; // HTMLElement
+children.labels; // HTMLElement[]
+```
+
+**Performance**: Zero overhead when no `signals` are specified - no DOM watching is enabled. Watchers are automatically removed when elements are destroyed.
 
 ### Chainable Hooks
 

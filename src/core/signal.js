@@ -3,16 +3,20 @@ import { isFunction, isUndefined } from '../utils/type-guards.js'
 import { logger } from '../utils/logger.js'
 
 /**
+ * @template T
+ * @typedef {Object} Signal
+ * @property {T} value
+ * @property {Function} destroy
+ * @property {Function} toString
+ * @property {Function} subscribe
+ */
+
+/**
  * A lightweight reactive primitive for storing local state.
  * 
  * @template T
  * @param {T} initialValue - The initial value to be stored in the signal
- * @returns {{
- *   value: T,
- *   subscribe: (callback: (newValue: T) => void) => (() => void),
- *   destroy: () => void,
- *   toString: () => string
- * }} A signal object with a value property
+ * @returns {Signal<T>} A signal object with a value property
  */
 export const signal = (initialValue) => {
   // Store value in a container object to avoid direct reassignment
