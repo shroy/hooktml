@@ -24,7 +24,7 @@
  * // Returns: { btn: Signal, btns: Signal }
  * // Access via: children.btn.value, children.btns.value
  */
-import { isArray, isHTMLElement, isNil, isNonEmptyString, isSignal } from '../utils/type-guards.js'
+import { isArray, isHTMLElement, isNil, isNonEmptyArray, isNonEmptyString, isSignal } from '../utils/type-guards.js'
 import { kebabToCamel, pluralize } from '../utils/strings.js'
 import { signal } from '../core/signal.js'
 import { registerChildrenWatcher } from '../core/observer.js'
@@ -118,7 +118,7 @@ export const useChildren = (element, prefix, config = {}) => {
   })
 
   // Register for DOM watching if any signals are requested
-  if (signals.length > 0) {
+  if (isNonEmptyArray(signals)) {
     registerChildrenWatcher(element, prefix, () => {
       scanElements()
 
@@ -128,7 +128,7 @@ export const useChildren = (element, prefix, config = {}) => {
 
         if (signals.includes(key)) {
           if (children[key] && isSignal(children[key])) {
-            children[key].value = elements[0]
+            children[key].value = isNonEmptyArray(elements) ? elements[0] : null
           }
           if (children[pluralKey] && isSignal(children[pluralKey])) {
             children[pluralKey].value = elements

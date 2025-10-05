@@ -339,7 +339,7 @@ const triggerChildrenWatchers = (elements) => {
   elements.forEach(element => {
     childrenWatchers.forEach(watcher => {
       // Check if this element is a descendant of or is the watched element
-      if (watcher.element === element || watcher.element.contains(element)) {
+      if (watcher.element === element || (watcher.element.isConnected && watcher.element.contains(element))) {
         if (!triggeredWatchers.has(watcher)) {
           triggeredWatchers.add(watcher)
           tryCatch({
