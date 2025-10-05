@@ -154,18 +154,11 @@ export const isHTMLElementArray = value => isNonEmptyArray(value) && value.every
 export const isObject = value => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /**
- * @template T
- * @typedef {Object} Signal
- * @property {T} value
- * @property {Function} subscribe
- */
-
-/**
  * Determines if an object is a signal (has .value getter/setter and subscribe method)
  * 
  * @template T
  * @param {unknown} obj - The object to check
- * @returns {obj is Signal<T>} - Whether the object is a signal with value property
+ * @returns {obj is import('../core/signal.js').Signal<T>} - Whether the object is a signal with value property
  */
 export const isSignal = (obj) => {
   return isNonEmptyObject(obj) &&

@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-10-04
+
+### Added
+
+- **Selective Reactivity for `useChildren`**: Added optional configuration parameter to make specific child properties reactive
+  - New third parameter `config = {}` with `signals: string[]` property
+  - Properties listed in `signals` array become reactive signals accessible via `.value`
+  - Both singular and plural forms become reactive when specified (e.g., `'button'` makes both `button` and `buttons` reactive)
+  - Zero performance overhead when no signals requested - no DOM watching enabled
+  - Maintains full backward compatibility - existing usage unchanged
+  - Automatic cleanup when elements are removed from DOM
+
+### Enhanced
+
+- **DOM Observer System**: Extended to support children watching for reactive `useChildren`
+  - Added `registerChildrenWatcher()` function for DOM mutation tracking
+  - Efficient batched updates when children elements change
+  - Proper cleanup of watchers when parent elements removed
+
+### Technical
+
+- Added comprehensive test coverage for reactive behavior
+- All existing tests continue to pass ensuring backward compatibility
+- Extended observer system with children mutation tracking
+
 ## [0.5.3] - 2025-09-21
 
 ### Fixed
