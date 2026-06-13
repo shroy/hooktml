@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-06-12
+
+### Added
+
+- **Agent-facing documentation (`AGENTS.md`)**: Comprehensive reference for AI agents working in consumer projects that use HookTML — covers mental model, React-vs-HookTML differences, API surface, and common mistakes
+- **Consumer skill (`skills/hooktml/SKILL.md`)**: Claude Code skill consumers can copy into their projects for accurate HookTML code generation
+- **Stimulus migration skill (`skills/hooktml-migrate-stimulus/SKILL.md`)**: Step-by-step guide for agents converting Stimulus controllers to HookTML hooks/components
+
+### Fixed
+
+- **Chainable API docs**: Removed nonexistent `.cleanup()` method from README examples — the chain returns itself from every method; individual hooks handle cleanup automatically
+
 ## [0.6.0] - 2025-10-04
 
 ### Added

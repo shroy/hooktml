@@ -1,6 +1,6 @@
 {
   "name": "hooktml",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "A reactive HTML component library with hooks-based lifecycle management",
   "main": "index.js",
   "type": "module",
@@ -40,7 +40,9 @@
     "src/utils/",
     "src/index.js",
     "dist/",
-    "README.md"
+    "README.md",
+    "AGENTS.md",
+    "skills/"
   ],
   "scripts": {
     "build": "esbuild index.global.js --bundle --format=iife --outfile=dist/hooktml.min.js --minify",
