@@ -790,8 +790,7 @@ with(el)
   .useEvents({ click: onClick })
   .useClasses({ active: isActive })
   .useAttributes({ "aria-expanded": isOpen })
-  .useText(() => `Hello ${firstName}`)
-  .cleanup();
+  .useText(() => `Hello ${firstName}`);
 ```
 
 ### Chainable Hooks
@@ -809,8 +808,7 @@ export const useTooltip = (el, { value }) => {
     .useClasses({
       "tooltip-visible": true,
       "text-sm": true
-    })
-    .cleanup();
+    });
 };
 ```
 
@@ -1096,8 +1094,7 @@ export const useTooltip = (el, { value }) => {
     .useClasses({
       "tooltip-visible": true,
       "text-sm": true
-    })
-    .cleanup();
+    });
 };
 ```
 
