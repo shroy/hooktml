@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.2] - 2026-06-20
+## [0.6.3] - 2026-06-20
 
 ### Fixed
 
-- **Publish workflow**: Added `workflow_dispatch` trigger so the publish workflow can be manually run from the GitHub Actions UI as a fallback
+- **CI workflows**: Use `yarn install --frozen-lockfile` instead of `npm ci` (repo uses yarn.lock, not package-lock.json)
+- **CI workflows**: Upgrade Node.js from 20 to 22 to resolve deprecation warnings
+- **Publish workflow**: Added `workflow_dispatch` trigger for manual runs from the GitHub Actions UI
 
 ## [0.6.1] - 2026-06-12
 

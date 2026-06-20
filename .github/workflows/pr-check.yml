@@ -1,0 +1,41 @@
+name: PR Version & Changelog Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check version bump
+        run: |
+          PR_VERSION=$(node -p "require('./package.json').version")
+          MAIN_VERSION=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).version")
+          echo "PR version: $PR_VERSION"
+          echo "main version: $MAIN_VERSION"
+          if [ "$PR_VERSION" = "$MAIN_VERSION" ]; then
+            echo "::error::package.json version ($PR_VERSION) has not been bumped from main"
+            exit 1
+          fi
+
+      - name: Check changelog entry
+        run: |
+          PR_VERSION=$(node -p "require('./package.json').version")
+          if ! grep -qE "^## \[$PR_VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md is missing a ## [$PR_VERSION] entry"
+            exit 1
+          fi
+          if git show origin/main:CHANGELOG.md | grep -qE "^## \[$PR_VERSION\]"; then
+            echo "::error::CHANGELOG.md ## [$PR_VERSION] entry already exists on main (not a new entry)"
+            exit 1
+          fi
+          echo "Found new changelog entry for version $PR_VERSION"
