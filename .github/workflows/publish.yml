@@ -49,6 +49,8 @@ jobs:
       - name: Publish to npm
         if: steps.check.outputs.skip == 'false'
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.npm_token}}
 
       - name: Extract changelog entry
         if: steps.check.outputs.skip == 'false'
