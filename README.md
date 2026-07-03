@@ -1324,3 +1324,5 @@ HookTML brings behavior to your HTML in a declarative, composable way — no ren
 * Reusable UI patterns like tooltips, tabs, modals, dropdowns
 * Hotwire/htmx projects that need just a touch of JS behavior
 * Teams who want the clarity of HTML with the composability of hooks
+
+<!-- pr-capability probe -->
