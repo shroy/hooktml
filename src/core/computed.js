@@ -1,69 +1,34 @@
 import { tryCatch } from '../utils/try-catch.js'
-import { isSignal, isFunction, isUndefined } from '../utils/type-guards.js'
+import { isSignal, isFunction } from '../utils/type-guards.js'
+import { startTracking, trackSignal } from './reactiveTracker.js'
+import { registerContextCleanup } from './hookContext.js'
 
 /**
- * Singleton class for managing computed signal dependency tracking
+ * Registers a signal read with the active dependency tracker.
+ *
+ * Re-exported for backwards compatibility; the tracker state now lives in the
+ * shared `reactiveTracker` module (imported by both `signal.js` and
+ * `computed.js`) rather than on a mutable `globalThis` handshake.
+ *
+ * @param {object} signalInstance - The reactive source being read.
  */
-class ComputedTracker {
-  /** @type {ComputedTracker | null} */
-  static instance = null
-
-  constructor() {
-    /** @type {Function | null} */
-    this.currentTracker = null
-    /** @type {Set<object>} */
-    this.computingSignals = new Set()
-  }
-
-  /** @returns {ComputedTracker} */
-  static getInstance() {
-    if (!this.instance) {
-      this.instance = new ComputedTracker()
-    }
-    return this.instance
-  }
-
-  trackDependency(signalInstance) {
-    if (this.currentTracker && isFunction(this.currentTracker)) {
-      this.currentTracker(signalInstance)
-    }
-  }
-
-  startTracking(trackerFn) {
-    const previousTracker = this.currentTracker
-    this.currentTracker = trackerFn
-    return () => {
-      this.currentTracker = previousTracker
-    }
-  }
-
-  isComputing(signal) {
-    return this.computingSignals.has(signal)
-  }
-
-  markAsComputing(signal) {
-    this.computingSignals.add(signal)
-  }
-
-  markAsComplete(signal) {
-    this.computingSignals.delete(signal)
-  }
-}
-
-const tracker = ComputedTracker.getInstance()
-
 export const trackDependency = (signalInstance) => {
-  tracker.trackDependency(signalInstance)
-}
-
-// Set up global tracking for signals to avoid circular imports
-if (!isUndefined(globalThis)) {
-  globalThis.__HOOKTML_TRACK_SIGNAL__ = trackDependency
+  trackSignal(signalInstance)
 }
 
 /**
- * Creates a computed signal that automatically tracks dependencies
- * 
+ * Creates a computed signal that automatically tracks dependencies.
+ *
+ * ## Disposal contract
+ * Reading `.value` subscribes the computed to the signals it depends on (the
+ * signals hold strong references to these subscriptions). Those subscriptions
+ * must be released to avoid leaking the computed:
+ *   - When `computed()` is called inside a component/hook (an active hook
+ *     context), disposal is registered with that context automatically and runs
+ *     when the element is torn down. Callers do not need to do anything.
+ *   - When `computed()` is called outside any hook context, the caller owns the
+ *     lifetime and must call `destroy()` when finished.
+ *
  * @template T
  * @param {() => T} computeFn - Function that computes the value
  * @returns {{
@@ -99,23 +64,32 @@ export const computed = (computeFn) => {
   // Schedule notification to break recursion cycle
   const scheduleNotification = () => {
     if (state.notificationScheduled || state.subscribers.size === 0) return
-    
+
     state.notificationScheduled = true
     queueMicrotask(() => {
       state.notificationScheduled = false
-      
-      if (state.subscribers.size > 0) {
-        // Recompute value and notify subscribers
-        const newValue = computedSignal.value
-        state.subscribers.forEach(callback => {
-          tryCatch({
-            fn: () => callback(newValue),
-            onError: (error) => {
-              console.error('[HookTML] Error in computed subscriber:', error)
-            }
+
+      if (state.subscribers.size === 0) return
+
+      // Recompute value and notify subscribers. A throwing computeFn must not
+      // escape the microtask (which would surface as an unhandled error and
+      // crash the host); swallow and log it instead.
+      tryCatch({
+        fn: () => {
+          const newValue = computedSignal.value
+          state.subscribers.forEach(callback => {
+            tryCatch({
+              fn: () => callback(newValue),
+              onError: (error) => {
+                console.error('[HookTML] Error in computed subscriber:', error)
+              }
+            })
           })
-        })
-      }
+        },
+        onError: (error) => {
+          console.error('[HookTML] Error recomputing computed signal:', error)
+        }
+      })
     })
   }
 
@@ -124,7 +98,7 @@ export const computed = (computeFn) => {
       // Return cached value if still valid
       if (!state.isStale && state.hasValue) {
         // Track this computed as a dependency for other computeds
-        trackDependency(computedSignal)
+        trackSignal(computedSignal)
         return /** @type {T} */ (state.value)
       }
 
@@ -138,18 +112,18 @@ export const computed = (computeFn) => {
 
       // Start computing
       state.isComputing = true
-      
+
       // Track new dependencies
       const newDependencies = new Set()
-      const stopTracking = tracker.startTracking((dependency) => {
+      const stopTracking = startTracking((dependency) => {
         if (isSignal(dependency) && !newDependencies.has(dependency)) {
           newDependencies.add(dependency)
-          
+
           // Subscribe to dependency changes
           const unsubscribe = dependency.subscribe(() => {
             const wasStale = state.isStale
             state.isStale = true
-            
+
             // Only schedule notification if we weren't already stale
             if (!wasStale && state.hasValue) {
               scheduleNotification()
@@ -159,12 +133,17 @@ export const computed = (computeFn) => {
         }
       })
 
-      // Compute the value
-      const result = computeFn()
-      
-      // Clean up tracking
-      stopTracking()
-      state.isComputing = false
+      // Compute the value. A throwing computeFn must always restore the tracker
+      // and the isComputing flag, otherwise (a) every later read reports a bogus
+      // "Circular dependency detected" and (b) the leaked tracker captures every
+      // subsequent signal read app-wide as a dependency of this broken computed.
+      let result
+      try {
+        result = computeFn()
+      } finally {
+        stopTracking()
+        state.isComputing = false
+      }
 
       // Update state
       state.dependencies = newDependencies
@@ -173,7 +152,7 @@ export const computed = (computeFn) => {
       state.isStale = false
 
       // Track this computed as a dependency for other computeds
-      trackDependency(computedSignal)
+      trackSignal(computedSignal)
 
       return result
     },
@@ -209,5 +188,9 @@ export const computed = (computeFn) => {
     }
   }
 
+  // If created inside a component/hook, release dependency subscriptions when
+  // the owning element is torn down (no manual destroy() required).
+  registerContextCleanup(() => computedSignal.destroy())
+
   return computedSignal
-} 
+}
