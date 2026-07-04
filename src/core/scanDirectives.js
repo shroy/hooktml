@@ -7,7 +7,7 @@ import { lifecycleManager } from './initialization.js'
 import { withHookContext } from './hookContext.js'
 import { logger } from '../utils/logger.js'
 import { getConfig } from './config.js'
-import { getHookInstance, storeHookInstance } from './hookInstanceRegistry.js'
+import { storeHookInstance } from './hookInstanceRegistry.js'
 
 /**
  * Creates a combined selector for all registered hooks
@@ -34,9 +34,12 @@ const createHookSelector = (hookNames, prefix = '') => {
 const getHookAttributesFromElement = (element, prefix = '') => {
   const attributes = Array.from(element.attributes)
   const usePrefix = `${prefix}use-`
+  // The `use-component` attribute is a reserved component-binding, not a hook.
+  // Excluding it here prevents a spurious "Unknown hook useComponent" warning.
+  const componentAttr = `${prefix}use-component`
 
   return attributes
-    .filter(attr => attr.name.startsWith(usePrefix))
+    .filter(attr => attr.name.startsWith(usePrefix) && attr.name !== componentAttr)
     .map(attr => ({
       name: attr.name.substring(prefix.length), // Remove prefix for processing
       originalName: attr.name, // Keep original for logging
@@ -49,14 +52,6 @@ const getHookAttributesFromElement = (element, prefix = '') => {
  * @param {HTMLElement} element - The DOM element to process
  */
 export const processElementHooks = (element) => {
-  // Skip if already processed - prevents infinite loop
-  const hasTeardowns = lifecycleManager.hasRegistration(element)
-
-  if (hasTeardowns) {
-    logger.log('⏭️ Skipping already processed element', element)
-    return
-  }
-
   const { formattedPrefix } = getConfig()
   const hookAttributes = getHookAttributesFromElement(element, formattedPrefix)
 
@@ -75,12 +70,21 @@ export const processElementHooks = (element) => {
     if (isNotNil(hookFn) && isFunction(hookFn)) {
       logger.log(`Found hook "${hookName}" for element:`, element)
 
-      // Check if we already have an instance for this hook
-      const existingInstance = getHookInstance(element, hookName)
-      if (existingInstance) {
-        logger.log(`Using existing instance for hook "${hookName}"`)
-        return // Skip re-initialization
+      // Skip if this specific directive has already been initialized on this
+      // element. Guarding on directive-initialized state (rather than on the
+      // presence of a teardown/instance) means a hook that returns neither a
+      // teardown nor a truthy instance still runs exactly once, and other
+      // directives on the same element are never skipped wholesale. (#23)
+      if (lifecycleManager.isDirectiveInitialized(element, hookName)) {
+        logger.log(`Directive "${hookName}" already initialized; skipping`)
+        return
       }
+
+      // Mark-before-run: flag the directive as initialized immediately, so a
+      // reentrant scan() triggered from within the hook body cannot
+      // double-initialize it. Cleared in the error path below so a failed hook
+      // can be retried on a later scan. (#25)
+      lifecycleManager.markDirectiveInitialized(element, hookName)
 
       // Extract all props for this hook (including main value and additional props)
       const props = extractHookProps(element, hookName, value)
@@ -108,6 +112,10 @@ export const processElementHooks = (element) => {
         },
         onError: (error) => {
           logger.error(`Error applying hook "${hookName}":`, error)
+          // Roll back the mark-before-run flag so a failed hook can be retried
+          // on a later scan. No partial instance can exist here because
+          // storeHookInstance only runs after the hook body returns.
+          lifecycleManager.clearDirectiveInitialized(element, hookName)
         }
       })
 
