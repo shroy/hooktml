@@ -4,13 +4,45 @@ import { logger } from '../utils/logger.js'
 
 /**
  * @typedef {Object} AutoRegisterOptions
- * @property {string} componentPath - Directory path to scan for components
+ * @property {string} componentPath - Directory path to scan for components.
+ *   SECURITY: this is a TRUSTED, arbitrary-code-execution input. Every
+ *   component-looking file under this path is `import()`ed, executing its
+ *   top-level module code. Only pass directories you fully control; never a
+ *   value derived from untrusted/user input.
  * @property {Function} [register] - Function to register components with
  * @property {boolean} [debug=false] - Enable debug logging
  */
 
 /**
- * Recursively collects all .js and .ts files from a directory (Node.js only)
+ * Determines whether a file's name looks like a HookTML component file and is
+ * therefore safe to import.
+ *
+ * IMPORTANT: `componentPath` is a TRUSTED, arbitrary-code-execution input by
+ * design — every file that is imported below has its top-level module code
+ * executed for its side effects, and ESM cannot inspect a module's exports
+ * without running it. Only point `componentPath` at directories you control.
+ *
+ * As defense-in-depth we restrict imports to filenames that could actually be
+ * a component: conventional PascalCase files (e.g. `Widget.js`) or kebab/snake
+ * files (e.g. `todo-list.js`) that {@link getExpectedExportName} maps to a
+ * PascalCase name. This skips lowercase single-word files (e.g. `utils.js`,
+ * `index.js`) so their arbitrary top-level code is never executed just by
+ * being present in the directory (issue #35).
+ * @param {string} filePath - Absolute path to a candidate file
+ * @param {{ basename: (p: string, ext?: string) => string, extname: (p: string) => string }} path - Node path module
+ * @returns {boolean} Whether the file may be imported as a component
+ */
+const isImportableComponentFile = (filePath, path) => {
+  if (!filePath.endsWith('.js') && !filePath.endsWith('.ts')) return false
+
+  const base = path.basename(filePath, path.extname(filePath))
+  // PascalCase (starts with an uppercase ASCII letter) or a kebab/snake name.
+  return /^[A-Z]/.test(base) || base.includes('-') || base.includes('_')
+}
+
+/**
+ * Recursively collects all component-looking .js and .ts files from a
+ * directory (Node.js only)
  * @param {string} dir - The directory to scan
  * @returns {Promise<string[]>} Array of file paths
  */
@@ -27,7 +59,7 @@ export const collectComponentFiles = async (dir) => {
 
   return files
     .flat()
-    .filter(file => file.endsWith('.js') || file.endsWith('.ts'))
+    .filter(file => isImportableComponentFile(file, path))
 }
 
 /**
@@ -64,7 +96,12 @@ const processComponentFile = async (filePath, register) => {
   return tryCatchAsync({
     fn: async () => {
       const expectedName = await getExpectedExportName(filePath)
-      const module = await import(/* @vite-ignore */filePath)
+      // Convert the absolute filesystem path to a file:// URL before importing.
+      // A bare absolute path fails on Windows (drive letter + backslashes) with
+      // ERR_UNSUPPORTED_ESM_URL_SCHEME, which would make every file "fail to
+      // import" and register 0 components (issue #35).
+      const { pathToFileURL } = await import('url')
+      const module = await import(/* @vite-ignore */pathToFileURL(filePath).href)
 
       // Check if module has a default export
       if (isNil(module.default)) {
@@ -242,8 +279,10 @@ export const autoRegisterComponents = async (options) => {
     throw new Error('[HookTML] autoRegisterComponents: componentPath must be a non-empty string')
   }
 
-  // Strategy 1: Node.js filesystem approach
-  if (isNonEmptyObject(process.versions) && process.versions.node) {
+  // Strategy 1: Node.js filesystem approach.
+  // Guard the bare `process` reference so this does not throw a ReferenceError
+  // in a non-Node, non-shimmed browser build (issue #35).
+  if (typeof process !== 'undefined' && isNonEmptyObject(process.versions) && process.versions.node) {
     if (debug) {
       logger.info('Using Node.js filesystem auto-registration')
     }

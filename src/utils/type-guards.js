@@ -33,6 +33,24 @@ export const isNotNil = value => !isNil(value)
 export const isNumeric = value => typeof value === 'string' && value.trim() !== '' && !isNaN(Number(value))
 
 /**
+ * Check if a value is a string that should be coerced to a Number.
+ *
+ * This is intentionally stricter than {@link isNumeric}: it only matches a
+ * plain decimal integer or float (optionally negative) with no leading zeros
+ * on the integer part. It deliberately does NOT match values that `Number()`
+ * would happily parse but that usually represent opaque string data —
+ * leading-zero IDs ("007"), scientific notation ("1e3"), hex/octal/binary
+ * literals ("0x10"), or whitespace-padded numbers (" 42 "). Those are
+ * preserved as strings so IDs, zip codes and version strings are not silently
+ * corrupted (issue #36).
+ *
+ * @param {unknown} value - The value to check.
+ * @returns {value is string} Whether the value is a plain decimal number string.
+ */
+export const isCoercibleNumber = value =>
+  typeof value === 'string' && /^-?(0|[1-9]\d*)(\.\d+)?$/.test(value)
+
+/**
  * Check if a value is a string.
  *
  * @param {unknown} value - The value to check.
