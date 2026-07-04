@@ -15,6 +15,7 @@ import { with as withEl } from './core/with.js'
 import { createObserver } from './core/observer.js'
 import { scanComponents, initializeComponents } from './core/scanComponents.js'
 import { scanDirectives } from './core/scanDirectives.js'
+import { injectCloakStyles } from './core/styleInjection.js'
 import { getRegisteredComponentNames, registerComponent, registerComponentByName } from './core/registry.js'
 import { initConfig, getConfig } from './core/config.js'
 import { signal } from './core/signal.js'
@@ -63,6 +64,11 @@ export const start = async (options) => {
       debug
     })
   }
+
+  // Inject the shared style tag + [data-hooktml-cloak] hiding rule immediately,
+  // so cloaked elements are hidden as soon as the runtime starts -- even when
+  // only style-less components are registered (prevents FOUC).
+  injectCloakStyles()
 
   // Create and start the observer
   observerRef.current = createObserver()
