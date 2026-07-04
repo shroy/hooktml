@@ -19,11 +19,13 @@ describe('Component Registry', () => {
     vi.clearAllMocks()
     clearRegistry() // Ensure a clean registry for each test
     
-    // Mock config to enable debug mode
-    vi.spyOn(configModule, 'getConfig').mockReturnValue({ 
+    // Mock config to enable debug mode. logger reads isDebug() (issue #32), so
+    // stub it alongside getConfig to keep debug logging active in these tests.
+    vi.spyOn(configModule, 'getConfig').mockReturnValue({
       componentSelectorMode: 'class',
-      debug: true 
+      debug: true
     })
+    vi.spyOn(configModule, 'isDebug').mockReturnValue(true)
     
     // Set up spies once and reuse them
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
