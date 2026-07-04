@@ -225,7 +225,14 @@ describe('useClasses', () => {
     })
 
     it('should handle mixed function, signal, and boolean conditions', () => {
+      // Spy BEFORE useClasses so the useEffect call is captured. Capture the effect
+      // callback into an outer var and run assertions OUTSIDE withHookContext (#45).
+      const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
+
       const isGloballyDisabled = signal(false)
+
+      /** @type {Function|undefined} */
+      let effectFn
 
       withHookContext(elements[0], () => {
         useClasses(elements, {
@@ -234,24 +241,26 @@ describe('useClasses', () => {
           visible: true
         })
 
-        elements.forEach((el, index) => {
-          expect(el.classList.contains('active')).toBe(index === 1)
-          expect(el.classList.contains('disabled')).toBe(false)
-          expect(el.classList.contains('visible')).toBe(true)
-        })
-
-        isGloballyDisabled.value = true
-
-        const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
         const effectCall = executeEffectSpy.mock.calls[0]
-        const effectFn = effectCall[0]
-        effectFn()
+        effectFn = effectCall[0]
+      })
 
-        elements.forEach((el, index) => {
-          expect(el.classList.contains('active')).toBe(index === 1)
-          expect(el.classList.contains('disabled')).toBe(true)
-          expect(el.classList.contains('visible')).toBe(true)
-        })
+      // Initial state
+      elements.forEach((el, index) => {
+        expect(el.classList.contains('active')).toBe(index === 1)
+        expect(el.classList.contains('disabled')).toBe(false)
+        expect(el.classList.contains('visible')).toBe(true)
+      })
+
+      // Change the signal and manually re-run the effect
+      isGloballyDisabled.value = true
+      effectFn()
+
+      // Only the signal-bound class changed
+      elements.forEach((el, index) => {
+        expect(el.classList.contains('active')).toBe(index === 1)
+        expect(el.classList.contains('disabled')).toBe(true)
+        expect(el.classList.contains('visible')).toBe(true)
       })
     })
 
@@ -306,30 +315,40 @@ describe('useClasses', () => {
     })
 
     it('should handle reactivity with signals in function conditions', () => {
+      // Spy BEFORE useClasses so the useEffect call is captured. Capture the effect
+      // callback into an outer var and run assertions OUTSIDE withHookContext (#45).
+      const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
+
       const selectedId = signal('1')
 
+      /** @type {Function|undefined} */
+      let effectFn
+
       withHookContext(elements[0], () => {
+        // A signal read inside a function condition is not auto-tracked, so it must be
+        // passed as an explicit dependency to make the classes reactive.
         useClasses(elements, {
           selected: (el) => selectedId.value === el.dataset.id,
           static: true
-        })
+        }, [selectedId])
 
-        elements.forEach((el, index) => {
-          expect(el.classList.contains('selected')).toBe(index === 1)
-          expect(el.classList.contains('static')).toBe(true)
-        })
-
-        selectedId.value = '2'
-
-        const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
         const effectCall = executeEffectSpy.mock.calls[0]
-        const effectFn = effectCall[0]
-        effectFn()
+        effectFn = effectCall[0]
+      })
 
-        elements.forEach((el, index) => {
-          expect(el.classList.contains('selected')).toBe(index === 2)
-          expect(el.classList.contains('static')).toBe(true)
-        })
+      // Initial state
+      elements.forEach((el, index) => {
+        expect(el.classList.contains('selected')).toBe(index === 1)
+        expect(el.classList.contains('static')).toBe(true)
+      })
+
+      // Change the signal and manually re-run the effect
+      selectedId.value = '2'
+      effectFn()
+
+      elements.forEach((el, index) => {
+        expect(el.classList.contains('selected')).toBe(index === 2)
+        expect(el.classList.contains('static')).toBe(true)
       })
     })
 

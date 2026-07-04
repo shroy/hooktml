@@ -44,6 +44,43 @@ const effectCleanups = new WeakMap()
 const initializedEffects = new WeakMap()
 
 /**
+ * Opt-in test/debug flag: when enabled, `withHookContext` re-throws non-framework
+ * errors (e.g. vitest AssertionErrors) instead of swallowing them. This exists so
+ * assertions placed inside a `withHookContext` callback are not silently eaten,
+ * which would let tests pass vacuously. It is OFF by default so production behavior
+ * (graceful degradation) is unchanged; the test suite opts in via src/tests/setup.js.
+ * @type {boolean}
+ */
+let rethrowInHookContext = false
+
+/**
+ * Enable or disable the opt-in rethrow behavior of `withHookContext`.
+ * @param {boolean} enabled - Whether non-framework errors should be re-thrown
+ * @returns {void}
+ */
+export const setRethrowInHookContext = (enabled) => {
+  rethrowInHookContext = Boolean(enabled)
+}
+
+/**
+ * Whether `withHookContext` currently re-throws non-framework errors.
+ * @returns {boolean}
+ */
+export const getRethrowInHookContext = () => rethrowInHookContext
+
+/**
+ * Determines whether an error is a framework (HookTML) operational error, which
+ * `withHookContext` intentionally swallows even in rethrow mode. Non-framework
+ * errors (AssertionErrors, unexpected runtime errors) are the ones surfaced.
+ * @param {unknown} error - The caught error
+ * @returns {boolean}
+ */
+const isFrameworkError = (error) =>
+  isObject(error) &&
+  typeof (/** @type {{ message?: unknown }} */ (error).message) === 'string' &&
+  /** @type {{ message: string }} */ (error).message.startsWith('[HookTML]')
+
+/**
  * Creates a hook context for a component or directive
  * @param {HTMLElement} element - The component/directive element
  * @returns {Object} - The hook context object
@@ -175,6 +212,11 @@ export const withHookContext = (element, callback) => {
     },
     onError: (error) => {
       logger.error('Error in withHookContext:', error)
+      // Opt-in test/debug mode: surface non-framework errors (e.g. AssertionErrors)
+      // so inner assertions can't pass vacuously. Off by default in production.
+      if (rethrowInHookContext && !isFrameworkError(error)) {
+        throw error
+      }
       return null
     },
     onFinally: () => {
