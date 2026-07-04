@@ -4,7 +4,7 @@ import {
   getRegisteredHooks,
   getRegisteredChainableHooks
 } from './src/core/hookRegistry.js'
-import { useEffect } from './src/core/hookContext.js'
+import { useEffect, onCleanup } from './src/core/hookContext.js'
 import { useChildren } from './src/hooks/useChildren.js'
 import { useEvents } from './src/hooks/useEvents.js'
 import { useClasses } from './src/hooks/useClasses.js'
@@ -92,6 +92,7 @@ export {
   registerHook,
   registerChainableHook,
   useEffect,
+  onCleanup,
   useChildren,
   useEvents,
   useClasses,
@@ -112,6 +113,7 @@ const HookTML = {
   registerHook,
   registerChainableHook,
   useEffect,
+  onCleanup,
   useChildren,
   useEvents,
   useClasses,

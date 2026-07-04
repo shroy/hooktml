@@ -5,12 +5,10 @@ import {
   isNil,
   isNonEmptyArray,
   isNonEmptyObject,
-  isNotNil,
   isSignal,
   isEmptyArray
 } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
-import { tryCatch } from '../utils/try-catch.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -87,52 +85,27 @@ export const useAttributes = (elementOrElements, attrMap, deps = []) => {
   // Apply attributes immediately
   applyAttributes()
 
-  // Set up reactive updates if any signals were provided
+  // Set up reactive updates if any signals were provided. useEffect keeps the
+  // attributes reactive both inside a hook context (queued + tracked for
+  // teardown) and outside one (applies + subscribes immediately, returning a
+  // combined cleanup we capture below).
+  let effectCleanup
   if (isNonEmptyArray(allDeps)) {
-    tryCatch({
-      fn: () => {
-        useEffect(() => {
-          applyAttributes()
-        }, allDeps)
-      },
-      onError: (error) => {
-        logger.error('Error in useAttributes:', error)
-
-        // Handle case where useEffect is called outside component/directive context
-        // Set up manual signal subscriptions as fallback
-        // Since we've already filtered with isSignal, we know these have a subscribe method
-        const unsubscribes = implicitDeps.map(signal => {
-          return isSignal(signal) ? signal.subscribe(() => applyAttributes()) : null
-        }).filter(isNotNil)
-
-        // Add cleanup for manual subscriptions to each element's modifiedAttributes for proper teardown
-        elements.forEach(element => {
-          const modifiedAttributes = modifiedAttributesPerElement.get(element)
-          if (modifiedAttributes) {
-            const originalCleanup = modifiedAttributes.get('__cleanup')
-            modifiedAttributes.set('__cleanup', () => {
-              unsubscribes.forEach(unsub => unsub())
-              if (isFunction(originalCleanup)) originalCleanup()
-            })
-          }
-        })
-      }
-    })
+    effectCleanup = useEffect(() => {
+      applyAttributes()
+    }, allDeps)
   }
 
   // Return cleanup function
   return () => {
+    // Tear down any effect subscriptions set up outside a hook context
+    if (isFunction(effectCleanup)) effectCleanup()
+
     elements.forEach(element => {
       const modifiedAttributes = modifiedAttributesPerElement.get(element)
       if (modifiedAttributes) {
-        // Run any stored cleanup function first
-        const cleanup = modifiedAttributes.get('__cleanup')
-        if (isFunction(cleanup)) cleanup()
-
         // Restore original attribute values
         modifiedAttributes.forEach((originalValue, attrName) => {
-          if (attrName === '__cleanup') return
-
           if (isNil(originalValue)) {
             element.removeAttribute(attrName)
           } else {
@@ -143,4 +116,4 @@ export const useAttributes = (elementOrElements, attrMap, deps = []) => {
       }
     })
   }
-} 
+}

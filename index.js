@@ -5,6 +5,7 @@ export {
   registerHook,
   registerChainableHook,
   useEffect,
+  onCleanup,
   useChildren,
   useEvents,
   useClasses,
