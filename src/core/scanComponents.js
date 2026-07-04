@@ -130,10 +130,12 @@ export const initializeComponents = (components) => {
         logger.log(`Initializing component: ${componentName}`)
         const props = extractProps(element, componentName)
         
-        // Run component initialization within a hook context
+        // Run component initialization within a hook context. Pass componentName
+        // so the component's effects get a stable, distinct identity on the
+        // element (a component + a directive on one element no longer collide).
         const result = withHookContext(element, () => {
           return componentFn(element, props)
-        })
+        }, componentName)
       
         // If the hook context returned null due to an error, return null
         if (result === null) {

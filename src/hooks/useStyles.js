@@ -10,7 +10,6 @@ import {
   isNonEmptyArray
 } from '../utils/type-guards.js'
 import { useEffect } from '../core/hookContext.js'
-import { tryCatch } from '../utils/try-catch.js'
 import { logger } from '../utils/logger.js'
 
 /**
@@ -82,49 +81,29 @@ export const useStyles = (elementOrElements, styleMap, deps = []) => {
 
   applyStyles()
 
+  // Set up reactive updates if any signals were provided. useEffect keeps the
+  // styles reactive both inside a hook context (queued + tracked for teardown)
+  // and outside one (applies + subscribes immediately, returning a combined
+  // cleanup we capture below).
+  let effectCleanup
   if (isNonEmptyArray(allDeps)) {
-    tryCatch({
-      fn: () => {
-        useEffect(() => {
-          applyStyles()
-        }, allDeps)
-      },
-      onError: (error) => {
-        logger.error('Error in useStyles:', error)
-
-        // Handle case where useEffect is called outside component/directive context
-        // Set up manual signal subscriptions as fallback
-        // Since we've already filtered with isSignal, we know these have a subscribe method
-        const unsubscribes = implicitDeps.map(signal => signal.subscribe(() => applyStyles()))
-
-        // Add cleanup for manual subscriptions to each element's modifiedStyles for proper teardown
-        elements.forEach(element => {
-          const modifiedStyles = modifiedStylesPerElement.get(element)
-          if (modifiedStyles) {
-            const originalCleanup = modifiedStyles.get('__cleanup')
-            modifiedStyles.set('__cleanup', () => {
-              unsubscribes.forEach(unsub => unsub())
-              if (isFunction(originalCleanup)) originalCleanup()
-            })
-          }
-        })
-      }
-    })
+    effectCleanup = useEffect(() => {
+      applyStyles()
+    }, allDeps)
   }
 
   return () => {
+    // Tear down any effect subscriptions set up outside a hook context
+    if (isFunction(effectCleanup)) effectCleanup()
+
     elements.forEach(element => {
       const modifiedStyles = modifiedStylesPerElement.get(element)
       if (modifiedStyles) {
-        const cleanup = modifiedStyles.get('__cleanup')
-        if (isFunction(cleanup)) cleanup()
-
         modifiedStyles.forEach((originalValue, prop) => {
-          if (prop === '__cleanup') return
           element.style[prop] = originalValue
         })
         modifiedStyles.clear()
       }
     })
   }
-} 
+}
