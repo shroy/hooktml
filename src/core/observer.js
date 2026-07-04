@@ -1,4 +1,3 @@
-import { scanComponents, initializeComponents } from './scanComponents.js'
 import { lifecycleManager } from './initialization.js'
 import { runCleanupFunctions } from './hookContext.js'
 import { isEmptyArray, isHTMLElement, isNonEmptyArray } from '../utils/type-guards.js'
@@ -7,7 +6,7 @@ import { tryCatch } from '../utils/try-catch.js'
 import { getRegisteredHooks } from './hookRegistry.js'
 import { getRegisteredComponentNames } from './registry.js'
 import { camelToKebab } from '../utils/strings.js'
-import { processElementHooks } from './scanDirectives.js'
+import { processElement } from './processElement.js'
 import { logger } from '../utils/logger.js'
 import { clearHookInstances } from './hookInstanceRegistry.js'
 
@@ -238,35 +237,15 @@ const createHookTMLDelegate = () => {
   }
 
   /**
-   * Processes a new element by applying hooks and initializing components
+   * Processes a new element by initializing its component then applying its
+   * hooks. Delegates to the shared processElement() so the dynamic (observer)
+   * path uses the exact same order as the static scan path. (#24)
    * @param {HTMLElement} element - Element to process
    */
   const addElement = (element) => {
     tryCatch({
       fn: () => {
-        // Process hooks on this specific element
-        const { formattedPrefix } = getConfig()
-        const hooks = getRegisteredHooks()
-        const hookNames = Array.from(hooks.keys())
-
-        if (isNonEmptyArray(hookNames)) {
-          const hookSelector = createHookSelector(hookNames, formattedPrefix)
-          if (element.matches(hookSelector)) {
-            processElementHooks(element)
-          }
-        }
-
-        // Process components
-        const componentNames = getRegisteredComponentNames()
-        if (isNonEmptyArray(componentNames)) {
-          const componentSelector = createComponentSelector(componentNames, formattedPrefix)
-          if (element.matches(componentSelector)) {
-            const foundComponents = scanComponents().filter(comp => comp.element === element)
-            if (isNonEmptyArray(foundComponents)) {
-              initializeComponents(foundComponents)
-            }
-          }
-        }
+        processElement(element)
       },
       onError: (error) => {
         if (getConfig().debug) {
