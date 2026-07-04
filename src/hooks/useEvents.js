@@ -45,43 +45,50 @@ export const useEvents = (elementOrElements, eventMap, deps = []) => {
   const implicitDeps = Object.values(eventMap).filter(isSignal)
   const allDeps = implicitDeps.concat(deps);
 
-  const currentHandlers = new Map()
+  // Track every listener we actually add as an {element, eventName, wrapper}
+  // tuple so cleanup removes exactly what was added — one entry per element per
+  // event, avoiding the leak from keying by event name alone.
+  let currentHandlers = []
+
+  const removeCurrentHandlers = () => {
+    currentHandlers.forEach(({ element, eventName, wrapper }) => {
+      element.removeEventListener(eventName, wrapper)
+    })
+    currentHandlers = []
+  }
 
   const updateEventListeners = () => {
-    currentHandlers.forEach((handler, eventName) => {
-      elements.forEach(element => {
-        element.removeEventListener(eventName, handler)
-      })
-    })
-    currentHandlers.clear()
+    removeCurrentHandlers()
 
-    const validHandlers = Object.entries(eventMap).filter(([eventName, handlerOrSignal]) => {
-      const handler = isSignal(handlerOrSignal)
+    Object.entries(eventMap).forEach(([eventName, handlerOrSignal]) => {
+      const initialHandler = isSignal(handlerOrSignal)
         ? handlerOrSignal.value
         : handlerOrSignal
 
-      if (!isFunction(handler)) {
+      if (!isFunction(initialHandler)) {
         logger.warn(`Event handler for '${eventName}' is not a function, skipping`)
         return
       }
 
-      return [eventName, handler]
-    })
-
-    elements.forEach((element, index) => {
-      validHandlers.forEach(([eventName, handler]) => {
+      elements.forEach((element, index) => {
         /**
+         * Resolve the handler at dispatch time so signal-wrapped handlers fire
+         * (the raw signal is never bound) and swaps take effect without re-bind.
          * @param {Event} event
          */
-        const handlerWithIndex = (event) => {
+        const wrapper = (event) => {
+          const handler = isSignal(handlerOrSignal)
+            ? handlerOrSignal.value
+            : handlerOrSignal
+
           if (isFunction(handler)) {
             handler(event, index)
           }
         }
 
-        element.addEventListener(eventName, handlerWithIndex)
+        element.addEventListener(eventName, wrapper)
 
-        currentHandlers.set(eventName, handlerWithIndex)
+        currentHandlers.push({ element, eventName, wrapper })
       })
     })
   }
@@ -95,11 +102,6 @@ export const useEvents = (elementOrElements, eventMap, deps = []) => {
   }
 
   return () => {
-    currentHandlers.forEach((handler, eventName) => {
-      elements.forEach(element => {
-        element.removeEventListener(eventName, handler)
-      })
-    })
-    currentHandlers.clear()
+    removeCurrentHandlers()
   }
-} 
+}
