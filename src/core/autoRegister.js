@@ -110,80 +110,6 @@ export const loadValidComponents = async (filePaths, register) => {
 }
 
 /**
- * Processes a single module entry from bundler glob imports
- * @param {[string, Function]} moduleEntry - [path, moduleLoader] pair
- * @param {Function} register - Registration function
- * @param {boolean} debug - Enable debug logging
- * @returns {Promise<boolean>} Whether the component was successfully registered
- */
-const processBundlerModule = async ([path, moduleLoader], register, debug) => {
-  return tryCatchAsync({
-    fn: async () => {
-      const module = await moduleLoader()
-
-      // Check if module has a default export that's a function
-      if (isNil(module.default) || !isFunction(module.default)) {
-        if (debug) {
-          logger.info(`Skipping ${path}: No valid default export`)
-        }
-        return false
-      }
-
-      // Register the component
-      register(module.default)
-
-      if (debug) {
-        logger.info(`Registered component: ${module.default.name} from ${path}`)
-      }
-
-      return true
-    },
-    onError: (error) => {
-      logger.warn(`Failed to load component from ${path}: ${error.message}`)
-      return false
-    }
-  })
-}
-
-/**
- * Gets bundler modules (limited due to static analysis requirements)
- * @param {string} componentPath - Component directory path
- * @param {boolean} debug - Enable debug logging
- * @returns {Record<string, Function>} Module entries from bundler
- */
-const getBundlerModules = (componentPath, debug) => {
-  if (debug) {
-    logger.warn(`Bundler auto-registration cannot dynamically use componentPath "${componentPath}"`)
-    logger.info('Bundlers require static import patterns. Use Node.js environment for dynamic paths.')
-  }
-
-  return {}
-}
-
-/**
- * Auto-registers components using bundler's glob import (Vite, Webpack, etc.)
- * Note: This requires the bundler to be configured with static glob patterns
- * @param {string} componentPath - Component directory path
- * @param {Function} register - Registration function
- * @param {boolean} debug - Enable debug logging
- * @returns {Promise<number>} Number of components registered
- */
-const autoRegisterWithBundler = async (componentPath, register, debug) => {
-  const modules = getBundlerModules(componentPath, debug)
-  const moduleEntries = Object.entries(modules)
-
-  if (debug) {
-    logger.info(`Found ${moduleEntries.length} potential component files using bundler`)
-  }
-
-  const results = await Promise.all(
-    moduleEntries.map(entry => processBundlerModule(entry, register, debug))
-  )
-
-  return results.filter(Boolean).length
-}
-
-/**
  * Auto-registers components using Node.js filesystem approach
  * @param {AutoRegisterOptions} options - Registration options
  * @returns {Promise<number>} Number of components registered
@@ -251,34 +177,10 @@ export const autoRegisterComponents = async (options) => {
     return await autoRegisterWithNodeJS(options)
   }
 
-  // Strategy 2: Bundler approach (Vite, Webpack, etc.)
-  // @ts-ignore - import.meta.glob is provided by bundlers like Vite
-  if (isFunction(import.meta?.glob)) {
-    if (debug) {
-      logger.info('Using bundler auto-registration')
-    }
-
-    return tryCatchAsync({
-      fn: async () => {
-        const registeredCount = await autoRegisterWithBundler(componentPath, register, debug)
-
-        if (debug) {
-          logger.info(`Successfully registered ${registeredCount} components using bundler`)
-        }
-
-        return registeredCount
-      },
-      onError: (error) => {
-        logger.error(`Error auto-registering components with bundler: ${error.message}`)
-        return 0
-      }
-    })
-  }
-
-  // Strategy 3: Graceful fallback
+  // Strategy 2: Graceful fallback
   if (debug) {
     logger.warn('Auto-registration not supported in this environment. Please register components manually.')
   }
 
   return 0
-} 
+}
