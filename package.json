@@ -12,7 +12,10 @@
     },
     "./package.json": "./package.json"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./index.global.js",
+    "./src/components/Button.js"
+  ],
   "keywords": [
     "html",
     "components",
