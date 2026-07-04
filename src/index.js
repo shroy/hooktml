@@ -64,7 +64,10 @@ export const start = async (options) => {
     })
   }
 
-  // Create and start the observer
+  // Create and start the observer.
+  // Stop any previous observer first so start() is idempotent and never leaks a
+  // live MutationObserver still registered on document.documentElement (BUG-15).
+  observerRef.current?.stop()
   observerRef.current = createObserver()
   observerRef.current.start()
 
