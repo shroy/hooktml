@@ -129,8 +129,33 @@ export const createHookContext = (element, name) => {
  * @returns {Object|null} - The current hook context or null
  */
 export const getCurrentContext = () => {
-  return hookContextStack.length > 0 ? 
+  return hookContextStack.length > 0 ?
     hookContextStack[hookContextStack.length - 1] : null
+}
+
+/**
+ * Registers a cleanup function with the currently active hook context so it runs
+ * when the owning element is torn down via {@link runCleanupFunctions}. Used by
+ * reactive primitives (e.g. `computed`) created inside a component/hook so their
+ * dependency subscriptions are released automatically, without the caller having
+ * to call `destroy()` manually.
+ *
+ * No-op when there is no active hook context (the caller then owns disposal).
+ *
+ * @param {() => void} cleanup - The disposer to run on teardown.
+ * @returns {boolean} - Whether a context was active and the cleanup was registered.
+ */
+export const registerContextCleanup = (cleanup) => {
+  if (!isFunction(cleanup)) return false
+
+  const context = getCurrentContext()
+  if (isNil(context)) return false
+
+  const { element } = context
+  const existingCleanups = componentCleanups.get(element) || []
+  existingCleanups.push(cleanup)
+  componentCleanups.set(element, existingCleanups)
+  return true
 }
 
 /**
