@@ -48,6 +48,30 @@ const getHookAttributesFromElement = (element, prefix = '') => {
 }
 
 /**
+ * Resolves the registered hook name for a kebab-case attribute name.
+ *
+ * `camelToKebab`/`kebabToCamel` are not inverses for names containing
+ * acronyms: `camelToKebab('useURLParser')` -> 'use-urlparser', but
+ * `kebabToCamel('use-urlparser')` -> 'useUrlparser', which never matches the
+ * registered name. Since the selector is built from `camelToKebab(name)`, we
+ * resolve back to the true registered name by matching each registered name's
+ * kebab form against the attribute (issue #40). The plain `kebabToCamel`
+ * result is used as a fast path for the common (non-acronym) case.
+ * @param {string} kebabName - The hook attribute name without prefix (e.g. 'use-tooltip')
+ * @returns {string} The resolved registered hook name
+ */
+const resolveRegisteredHookName = (kebabName) => {
+  const direct = kebabToCamel(kebabName)
+  if (isNotNil(getRegisteredHook(direct))) return direct
+
+  for (const registeredName of getRegisteredHooks().keys()) {
+    if (camelToKebab(registeredName) === kebabName) return registeredName
+  }
+
+  return direct
+}
+
+/**
  * Processes a single element, applying all hooks defined on it
  * @param {HTMLElement} element - The DOM element to process
  */
@@ -59,9 +83,11 @@ export const processElementHooks = (element) => {
 
   // For each hook attribute, find and call the corresponding function
   hookAttributes.forEach(({ name, originalName, value }) => {
-    // Properly capitalize the hook name (e.g., "teardown" -> "useTeardown")
-    // Must use exact case to match registered hook
-    const hookName = kebabToCamel(name)
+    // Resolve the registered hook name from the kebab attribute. Uses the
+    // plain kebabToCamel result as a fast path, then falls back to matching
+    // registered names by their kebab form so acronym hooks (e.g.
+    // useURLParser -> use-urlparser) resolve correctly (issue #40).
+    const hookName = resolveRegisteredHookName(name)
 
     logger.log(`Looking for hook "${hookName}" from attribute "${originalName}"`)
 
@@ -158,10 +184,17 @@ export const scanDirectives = () => {
 
   logger.log(`Scanning DOM for hook directives with selector: "${selector}"`)
 
-  // Find all elements with use-* attributes and ensure they are HTMLElements
+  // Find all elements with use-* attributes and ensure they are HTMLElements.
+  // Guard querySelectorAll so a malformed selector (e.g. from a bad attribute
+  // prefix) can never throw out of a scan and break observation (issue #33).
   /** @type {HTMLElement[]} */
-  const elements = Array.from(document.querySelectorAll(selector))
-    .filter(isHTMLElement)
+  const elements = tryCatch({
+    fn: () => Array.from(document.querySelectorAll(selector)).filter(isHTMLElement),
+    onError: (error) => {
+      logger.error(`Invalid hook selector "${selector}":`, error)
+      return []
+    }
+  })
 
   logger.log(`Found ${elements.length} element(s) with hook directives`)
 

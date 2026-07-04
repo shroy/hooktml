@@ -1,10 +1,17 @@
-import { isNumeric, isNonEmptyString } from './type-guards.js'
+import { isCoercibleNumber, isNonEmptyString } from './type-guards.js'
 import { extractChildren } from './children.js'
 import { kebabToCamel, camelToKebab } from './strings.js'
 import { getConfig } from '../core/config.js'
 
 /**
  * Coerces a string value to the appropriate JavaScript primitive
+ *
+ * Numeric coercion is restricted to plain decimal integers/floats
+ * (see {@link isCoercibleNumber}). Values such as leading-zero IDs ("007"),
+ * scientific notation ("1e3"), hex literals ("0x10") or whitespace-padded
+ * numbers (" 42 ") are preserved as their original strings so string data is
+ * not silently corrupted (issue #36).
+ *
  * @param {string} value - The string value to coerce
  * @returns {string|number|boolean|null} The coerced value
  */
@@ -12,7 +19,7 @@ export const coerceValue = (value) => {
   if (value === 'true') return true
   if (value === 'false') return false
   if (value === 'null') return null
-  if (isNumeric(value)) return Number(value)
+  if (isCoercibleNumber(value)) return Number(value)
   return value
 }
 
