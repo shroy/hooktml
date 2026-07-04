@@ -28,6 +28,7 @@ import { isArray, isHTMLElement, isNil, isNonEmptyArray, isNonEmptyString, isSig
 import { kebabToCamel, pluralize } from '../utils/strings.js'
 import { signal } from '../core/signal.js'
 import { registerChildrenWatcher } from '../core/observer.js'
+import { getConfig } from '../core/config.js'
 
 /**
  * Resolves scoped child elements by prefix within the current hook context
@@ -47,8 +48,9 @@ export const useChildren = (element, prefix, config = {}) => {
   }
 
   const { signals = [] } = config
-  const useHookSelector = `[use-${prefix}]`
-  const prefixWithHyphen = `${prefix}-`
+  const { formattedPrefix } = getConfig()
+  const useHookSelector = `[${formattedPrefix}use-${prefix}]`
+  const prefixWithHyphen = `${formattedPrefix}${prefix}-`
 
   /** @type {Record<string, HTMLElement | HTMLElement[] | Signal>} */
   const children = {}

@@ -79,8 +79,16 @@ const processMutation = (state, mutation) => {
       return [element, ...descendants]
     })
 
+  // Include the mutation target (the parent whose childList changed). For
+  // removals the removed nodes are already detached, so watchers scoped to the
+  // still-attached parent only fire if we consult mutation.target directly.
+  const target = mutation.target
+  const targetElements = isHTMLElement(target) && isElementNode(target)
+    ? [/** @type {HTMLElement} */ (target)]
+    : []
+
   // Trigger children watchers for all affected elements
-  const affectedElements = [...removedElements, ...addedElements]
+  const affectedElements = [...removedElements, ...addedElements, ...targetElements]
   if (isNonEmptyArray(affectedElements)) {
     triggerChildrenWatchers(affectedElements)
   }
