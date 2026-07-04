@@ -62,31 +62,46 @@ const getComponentNameFromElement = (element, componentNames, prefix = '') => {
 
 /**
  * Scans the DOM for registered components
+ * @param {ParentNode} [root=document] - Root to scan within. Scoping to a
+ *   subtree avoids whole-document scans on incremental updates (issue #31).
  * @returns {FoundComponent[]} Array of found components
  */
-export const scanComponents = () => {
+export const scanComponents = (root = document) => {
   // Keep this original log message for backward compatibility with tests
   logger.log('Scanning for components...')
-  
+
   const componentNames = getRegisteredComponentNames()
   const { formattedPrefix } = getConfig()
-  
+
   // If no components registered, return empty array
   if (!componentNames.length) {
     logger.log('No components registered yet')
     return []
   }
-  
+
   const classSelector = createClassSelector(componentNames)
   const useComponentSelector = createUseComponentSelector(componentNames, formattedPrefix)
   const selector = `${classSelector}, ${useComponentSelector}`
-  
+
   logger.log(`Scanning DOM with selector: "${selector}"`)
-  
-  // Find all matching elements
+
+  // Find all matching elements within the given root.
   /** @type {HTMLElement[]} */
-  const elements = Array.from(document.querySelectorAll(selector))
-  
+  const descendants = Array.from(root.querySelectorAll(selector))
+
+  // `querySelectorAll` only matches descendants, so when scanning a scoped
+  // Element root (issue #31), include the root itself if it matches — otherwise
+  // a component element passed as its own root would be missed.
+  const rootMatches =
+    root !== document &&
+    isFunction(/** @type {any} */ (root).matches) &&
+    /** @type {Element} */ (root).matches(selector)
+
+  /** @type {HTMLElement[]} */
+  const elements = rootMatches
+    ? [/** @type {HTMLElement} */ (root), ...descendants]
+    : descendants
+
   // Map to component objects
   return elements
     .map(element => {

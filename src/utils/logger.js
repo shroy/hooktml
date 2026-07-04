@@ -3,7 +3,7 @@
  * @module logger
  */
 
-import { getConfig } from '../core/config.js'
+import { isDebug } from '../core/config.js'
 import { isFunction } from './type-guards.js'
 
 /**
@@ -32,8 +32,7 @@ export const logger = {
    * @param {...any} args - Additional arguments to log
    */
   log: (message, ...args) => {
-    const { debug } = getConfig()
-    if (debug && isFunction(console.log)) {
+    if (isDebug() && isFunction(console.log)) {
       console.log(prefixMessage(message), ...args)
     }
   },
@@ -44,8 +43,7 @@ export const logger = {
    * @param {...any} args - Additional arguments to log
    */
   info: (message, ...args) => {
-    const { debug } = getConfig()
-    if (debug && isFunction(console.info)) {
+    if (isDebug() && isFunction(console.info)) {
       console.info(prefixMessage(message), ...args)
     }
   },

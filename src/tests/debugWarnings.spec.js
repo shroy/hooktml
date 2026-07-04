@@ -87,6 +87,8 @@ describe('Debug Warnings', () => {
         componentSelectorMode: 'class',
         debug: true
       })
+      // logger.log reads isDebug() directly (issue #32), so stub it too.
+      vi.spyOn(configModule, 'isDebug').mockReturnValue(true)
 
       // Component with styles
       function DuplicateComponent() {}
@@ -140,12 +142,14 @@ describe('Debug Warnings', () => {
     })
     
     it('should log successful style injection when debug is enabled', () => {
-      // Mock config to enable debug mode
+      // Mock config to enable debug mode. The success log goes through
+      // logger.log, which reads isDebug() (issue #32), so stub it too.
       vi.spyOn(configModule, 'getConfig').mockReturnValue({
         componentSelectorMode: 'class',
         debug: true
       })
-      
+      vi.spyOn(configModule, 'isDebug').mockReturnValue(true)
+
       // Component with styles
       function TestComponent() {}
       TestComponent.styles = 'color: blue;'

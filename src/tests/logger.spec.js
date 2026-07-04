@@ -15,18 +15,21 @@ describe('logger', () => {
     error: console.error
   }
   
-  // Mock getConfig
+  // Mock the debug gate the logger reads (issue #32: logger now reads isDebug()
+  // instead of cloning the whole config via getConfig()).
   const mockGetConfig = vi.fn()
-  
+  const mockIsDebug = vi.fn()
+
   beforeEach(() => {
     // Reset mocks for each test
     console.log = vi.fn()
     console.info = vi.fn()
     console.warn = vi.fn()
     console.error = vi.fn()
-    
+
     // Mock the config
     vi.spyOn(configModule, 'getConfig').mockImplementation(mockGetConfig)
+    vi.spyOn(configModule, 'isDebug').mockImplementation(mockIsDebug)
   })
   
   afterEach(() => {
@@ -42,6 +45,7 @@ describe('logger', () => {
   describe('when debug is true', () => {
     beforeEach(() => {
       mockGetConfig.mockReturnValue({ debug: true })
+      mockIsDebug.mockReturnValue(true)
     })
     
     it('calls console.log with prefixed message', () => {
@@ -58,6 +62,7 @@ describe('logger', () => {
   describe('when debug is false', () => {
     beforeEach(() => {
       mockGetConfig.mockReturnValue({ debug: false })
+      mockIsDebug.mockReturnValue(false)
     })
     
     it('does not call console.log', () => {

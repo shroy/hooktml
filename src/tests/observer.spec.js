@@ -38,8 +38,12 @@ describe('DOM Observer', () => {
     observer.start()
 
     expect(MutationObserver).toHaveBeenCalled()
+    // issue #31: attribute observation is now scoped via attributeFilter so the
+    // observer only wakes on relevant attribute churn. With no hooks/components
+    // registered the filter still covers class + use-component.
     expect(mockMutationObserver.observe).toHaveBeenCalledWith(document.documentElement, {
       attributes: true,
+      attributeFilter: ['class', 'use-component'],
       childList: true,
       subtree: true
     })

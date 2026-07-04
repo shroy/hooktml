@@ -33,7 +33,12 @@ import { clearHookInstances } from './hookInstanceRegistry.js'
 const isElementNode = (node) => node.nodeType === Node.ELEMENT_NODE
 
 /**
- * Processes a mutation record
+ * Processes a mutation record.
+ *
+ * Handles per-record bookkeeping (removed-element teardown, children watchers)
+ * only. The element-tracking `refresh` is intentionally NOT called here — it is
+ * run once per callback batch by the observer (issue #31), so a batch of K
+ * records no longer triggers K whole-document scans.
  * @param {MutableObserverState} state - Observer state
  * @param {MutationRecord} mutation - Mutation record to process
    */
@@ -79,9 +84,6 @@ const processMutation = (state, mutation) => {
   if (isNonEmptyArray(affectedElements)) {
     triggerChildrenWatchers(affectedElements)
   }
-
-  // Refresh to handle added nodes and attribute changes
-  refresh(state)
 }
 
 /**
@@ -125,13 +127,18 @@ const createElementObserver = (root, delegate) => {
 
   const mutationObserver = new MutationObserver((mutations) => {
     if (state.started) {
+      // Per-record bookkeeping (removals, children watchers) for the whole batch,
+      // then a single element-tracking refresh for the batch — not one per
+      // record — so a batch of K records causes one whole-document scan (issue #31).
       mutations.forEach(mutation => processMutation(state, mutation))
+      refresh(state)
     }
   })
 
   const observe = () =>
     mutationObserver.observe(root, {
       attributes: true,
+      attributeFilter: getObservedAttributes(),
       childList: true,
       subtree: true
     })
@@ -198,6 +205,25 @@ const createComponentSelector = (componentNames, prefix = '') => {
     .map(name => `[${prefix}use-component="${name}"]`)
     .join(', ')
   return `${classSelector}, ${useComponentSelector}`
+}
+
+/**
+ * Builds the list of attribute names worth observing, so the MutationObserver
+ * only wakes on relevant attribute churn instead of every attribute change in
+ * the subtree (issue #31). Covers each registered hook directive attribute,
+ * the (prefixed) `use-component` attribute, and `class` (class-based components).
+ * @returns {string[]} Attribute names for `attributeFilter`
+ */
+const getObservedAttributes = () => {
+  const { formattedPrefix } = getConfig()
+  const hookNames = Array.from(getRegisteredHooks().keys())
+
+  const hookAttributes = hookNames.map(name => `${formattedPrefix}${camelToKebab(name)}`)
+
+  // `class` and `use-component` are always relevant: components can be matched
+  // by class name or by the (prefixed) use-component attribute, and either may
+  // be added to an already-present element after observation starts.
+  return [...hookAttributes, 'class', `${formattedPrefix}use-component`]
 }
 
 /**

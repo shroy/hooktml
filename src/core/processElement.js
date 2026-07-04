@@ -55,7 +55,7 @@ export const processElement = (element) => {
   if (isNonEmptyArray(componentNames)) {
     const componentSelector = buildComponentSelector(componentNames, formattedPrefix)
     if (componentSelector && element.matches(componentSelector)) {
-      const foundComponents = scanComponents().filter(comp => comp.element === element)
+      const foundComponents = scanComponents(element).filter(comp => comp.element === element) // scoped scan (#31): avoid a whole-document scanComponents per added element
       if (isNonEmptyArray(foundComponents)) {
         initializeComponents(foundComponents)
       }
