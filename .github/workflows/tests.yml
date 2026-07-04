@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run test suite
+        run: yarn vitest run
+
+      - name: Node ESM smoke test
+        run: node --input-type=module -e "await import('./index.js')"
