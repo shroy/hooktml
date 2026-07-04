@@ -90,27 +90,6 @@ export const clearRegistry = () => {
 }
 
 /**
- * Placeholder for future build tool integration
- * This function would automatically register components from a glob pattern
- * 
- * Example usage with Vite:
- * ```
- * // Get all component files
- * const componentFiles = import.meta.glob('./components/*.js')
- * registerFromGlob(componentFiles)
- * ```
- * 
- * Note: Parameter is commented out until implementation is complete
- */
-export const registerFromGlob = () => {
-  logger.warn('[HookTML] registerFromGlob is not implemented yet')
-  // Future implementation will:
-  // 1. Extract component names from file paths
-  // 2. Import the modules to trigger their registerComponent calls
-  // 3. Return a Promise that resolves when all components are registered
-}
-
-/**
  * Adapter function to register a component by name and function
  * This helps autoRegisterComponents work with the existing registry
  * @param {string} name - Component name

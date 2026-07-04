@@ -1,6 +1,6 @@
-import { useEffect } from "../core/hookContext"
-import { logger } from "../utils/logger"
-import { isFunction, isHTMLElement, isNil } from "../utils/type-guards"
+import { useEffect } from "../core/hookContext.js"
+import { logger } from "../utils/logger.js"
+import { isFunction, isHTMLElement, isNil } from "../utils/type-guards.js"
 
 /**
  * Hook for setting text content on an element
