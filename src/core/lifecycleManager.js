@@ -282,6 +282,25 @@ export class LifecycleManager {
   }
 
   /**
+   * Marks a directive as initialized for an element (convenience method)
+   * @param {HTMLElement} element - The DOM element
+   * @param {string} directiveName - The name of the directive
+   */
+  markDirectiveInitialized(element, directiveName) {
+    this.stateManager.markDirectiveInitialized(element, directiveName)
+  }
+
+  /**
+   * Clears the initialized flag for a single directive on an element without
+   * tearing down or removing its teardown registration (convenience method).
+   * @param {HTMLElement} element - The DOM element
+   * @param {string} directiveName - The name of the directive
+   */
+  clearDirectiveInitialized(element, directiveName) {
+    this.stateManager.clearDirectiveInitialized(element, directiveName)
+  }
+
+  /**
    * Clears all state for an element (convenience method)
    * @param {HTMLElement} element - The DOM element
    */

@@ -1,7 +1,7 @@
 import { getConfig } from './config.js'
 import { getRegisteredComponent, getRegisteredComponentNames } from './registry.js'
 import { isNotNil, isEmptyArray, isNil, isFunction, isObject } from '../utils/type-guards.js'
-import { lifecycleManager, markInitialized } from './initialization.js'
+import { lifecycleManager, markInitialized, clearInitialized } from './initialization.js'
 import { extractProps } from '../utils/props.js'
 import { withHookContext } from './hookContext.js'
 import { injectComponentStyles } from './styleInjection.js'
@@ -119,12 +119,19 @@ export const initializeComponents = (components) => {
     }
 
     const componentFn = getRegisteredComponent(componentName)
-    
+
     if (isNil(componentFn)) {
       logger.warn(`No registered function found for component: ${componentName}`)
       return null
     }
-    
+
+    // Mark-before-run: flag the element as initialized immediately, before the
+    // component body runs. A component whose body synchronously triggers a
+    // scan() would otherwise re-enter this loop for the same element before the
+    // flag was set and initialize it twice. Cleared in the error path below so
+    // a component that throws can be retried on a later scan. (#25)
+    markInitialized(element)
+
     return tryCatch({
       fn: () => {
         logger.log(`Initializing component: ${componentName}`)
@@ -137,8 +144,11 @@ export const initializeComponents = (components) => {
           return componentFn(element, props)
         }, componentName)
       
-        // If the hook context returned null due to an error, return null
+        // If the hook context returned null due to an error, roll back the
+        // mark-before-run flag so the component can be retried on a later scan,
+        // then return null.
         if (result === null) {
+          clearInitialized(element)
           return null
         }
       
@@ -168,18 +178,21 @@ export const initializeComponents = (components) => {
       
         // Inject component styles and remove cloak
         injectComponentStyles(componentFn, element)
-      
-        // Mark element as initialized (this will also mark in lifecycleManager)
-        markInitialized(element)
-      
-        return { 
-          element, 
-          componentName, 
-          instance: result 
+
+        // Element was already marked initialized before the body ran
+        // (mark-before-run). registerComponent above also marks it.
+
+        return {
+          element,
+          componentName,
+          instance: result
         }
       },
       onError: (error) => {
         logger.error(`Error initializing component ${componentName}:`, error)
+        // Roll back the mark-before-run flag so a component that threw can be
+        // retried on a later scan.
+        clearInitialized(element)
         return null
       }
     })

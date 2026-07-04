@@ -120,6 +120,26 @@ export class StateManager {
   }
 
   /**
+   * Clears the initialized flag for a single directive on an element. Used to
+   * roll back a mark-before-run directive initialization that then threw, so a
+   * later scan can retry that directive.
+   * @param {HTMLElement} element - The DOM element
+   * @param {string} directiveName - The name of the directive
+   */
+  clearDirectiveInitialized(element, directiveName) {
+    if (!isHTMLElement(element) || !directiveName) {
+      return
+    }
+
+    const state = this.stateRegistry.get(element)
+    if (state) {
+      state.initializedDirectives = state.initializedDirectives.filter(
+        (name) => name !== directiveName
+      )
+    }
+  }
+
+  /**
    * Clears all state for an element
    * @param {HTMLElement} element - The DOM element
    */
