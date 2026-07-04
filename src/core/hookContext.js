@@ -2,16 +2,25 @@
  * This module provides a React-like hook context system to manage
  * component-scoped hooks and cleanup functions.
  */
-import { isFunction, isNil, isEmptyArray, isNotNil, isNonEmptyArray, isArray, isObject, isSignal } from '../utils/type-guards.js'
+import { isFunction, isNil, isEmptyArray, isNotNil, isNonEmptyArray, isNonEmptyString, isArray, isObject, isSignal } from '../utils/type-guards.js'
 import { tryCatch } from '../utils/try-catch.js'
 import { getConfig } from './config.js'
 import { logger } from '../utils/logger.js'
 
 /**
  * Stack of active hook contexts
- * @type {Array<{element: HTMLElement, effectQueue: Function[], cleanups: Function[]}>}
+ * @type {Array<{id: number, element: HTMLElement, effectQueue: Function[], effectOrder: number, cleanups: Function[]}>}
  */
 const hookContextStack = []
+
+/**
+ * Monotonic counter used to give every hook context a unique id, which also
+ * seeds a fallback context name when the caller does not supply one. Effect
+ * identity is namespaced by the context name so two directives on the same
+ * element each run in their own context and must not collide (see #14).
+ * @type {number}
+ */
+let contextIdCounter = 0
 
 /**
  * Map to store cleanup functions for each element
@@ -20,48 +29,61 @@ const hookContextStack = []
 const componentCleanups = new WeakMap()
 
 /**
- * Map to store effect subscriptions for each element
- * @type {WeakMap<HTMLElement, Map<number, Set<Function>>>}
+ * Map to store effect subscriptions for each element, keyed by a
+ * context-namespaced effect key (`${contextName}:${index}`)
+ * @type {WeakMap<HTMLElement, Map<string, Set<Function>>>}
  */
 const effectSubscriptions = new WeakMap()
 
 /**
- * Map to track effect order for each element
- * @type {WeakMap<HTMLElement, number>}
- */
-const effectOrder = new WeakMap()
-
-/**
- * Map to store effect cleanups by order
- * @type {WeakMap<HTMLElement, Map<number, Function>>}
+ * Map to store effect cleanups, keyed by a context-namespaced effect key
+ * @type {WeakMap<HTMLElement, Map<string, Function>>}
  */
 const effectCleanups = new WeakMap()
 
 /**
- * Map to track initialized effects by order
- * @type {WeakMap<HTMLElement, Set<number>>}
+ * Map to track initialized effects, keyed by a context-namespaced effect key
+ * @type {WeakMap<HTMLElement, Set<string>>}
  */
 const initializedEffects = new WeakMap()
 
 /**
+ * Builds the per-element key that identifies a single effect. The key is
+ * namespaced by the owning context's name so a second hook's effect on the same
+ * element does not collide with the first hook's effect at the same index (#14),
+ * while re-processing the SAME hook on the same element reuses the same key so
+ * its effect is not needlessly re-run.
+ * @param {{name: string}} context - The owning hook context
+ * @param {number} order - The effect's order within its context
+ * @returns {string} - The namespaced effect key
+ */
+const getEffectKey = (context, order) => `${context.name}:${order}`
+
+/**
  * Creates a hook context for a component or directive
  * @param {HTMLElement} element - The component/directive element
+ * @param {string} [name] - A stable name for the context (hook/component name).
+ *   Effect identity is namespaced by this name so distinct hooks on the same
+ *   element don't collide. When omitted, a unique per-context name is generated.
  * @returns {Object} - The hook context object
  */
-export const createHookContext = (element) => {
+export const createHookContext = (element, name) => {
+  const id = contextIdCounter++
   const context = {
+    id,
+    // Stable namespace for effect identity; fall back to a unique id when the
+    // caller does not supply a name (e.g. direct withHookContext usage).
+    name: isNonEmptyString(name) ? name : `ctx#${id}`,
     element,
     effectQueue: [],
+    effectOrder: 0,
     cleanups: []
   }
-  
-  // Get existing cleanups or initialize an empty array
+
+  // Ensure a cleanups store exists for this element so onCleanup(fn) can feed it
   const existingCleanups = componentCleanups.get(element) || []
   componentCleanups.set(element, existingCleanups)
-  
-  // Reset effect order for this element
-  effectOrder.set(element, 0)
-  
+
   return context
 }
 
@@ -78,12 +100,12 @@ export const getCurrentContext = () => {
  * Executes an effect and sets up any necessary cleanup
  * @param {Function} effectFn - The effect function to execute
  * @param {HTMLElement} element - The associated element
- * @param {number} order - The effect's order in the hook
+ * @param {string} key - The effect's context-namespaced identity key
  * @returns {Function|undefined} - The cleanup function if one was returned
  */
-const executeEffect = (effectFn, element, order) => {
+const executeEffect = (effectFn, element, key) => {
   let cleanup
-  
+
   tryCatch({
     fn: () => {
       // Get existing cleanups for this element
@@ -92,34 +114,34 @@ const executeEffect = (effectFn, element, order) => {
         elementCleanups = new Map()
         effectCleanups.set(element, elementCleanups)
       }
-      
-      // Run existing cleanup for this effect order if it exists
-      const existingCleanup = elementCleanups.get(order)
+
+      // Run existing cleanup for this effect if it exists
+      const existingCleanup = elementCleanups.get(key)
       if (isFunction(existingCleanup)) {
         runCleanup(existingCleanup)
       }
-      
+
       // Run the effect and get any cleanup function
       cleanup = effectFn()
-      
+
       // If the effect returns a cleanup function, store it
       if (isFunction(cleanup)) {
-        elementCleanups.set(order, cleanup)
+        elementCleanups.set(key, cleanup)
       }
-      
+
       // Mark this effect as initialized
       let elementInitialized = initializedEffects.get(element)
       if (!elementInitialized) {
         elementInitialized = new Set()
         initializedEffects.set(element, elementInitialized)
       }
-      elementInitialized.add(order)
+      elementInitialized.add(key)
     },
     onError: (error) => {
       logger.error('Error in effect execution:', error)
     }
   })
-  
+
   return cleanup
 }
 
@@ -129,42 +151,42 @@ const executeEffect = (effectFn, element, order) => {
  */
 const executeEffectQueue = (context) => {
   const { element, effectQueue } = context
-  
+
   if (isEmptyArray(effectQueue)) {
     return
   }
-  
+
   logger.log(`Executing ${effectQueue.length} effect(s) for element:`, element)
-  
+
   // Get or create the set of initialized effects for this element
   let elementInitialized = initializedEffects.get(element)
   if (!elementInitialized) {
     elementInitialized = new Set()
     initializedEffects.set(element, elementInitialized)
   }
-  
-  // Execute each effect that hasn't been initialized
-  effectQueue.forEach((effect, index) => {
-    if (!elementInitialized.has(index)) {
-      executeEffect(effect, element, index)
+
+  // Drain with a while-loop (not forEach) so effects queued from inside another
+  // effect's setup body are also executed rather than dropped (see #39).
+  while (effectQueue.length > 0) {
+    const effect = effectQueue.shift()
+    const key = effect.__effectKey
+    if (!elementInitialized.has(key)) {
+      executeEffect(effect, element, key)
     }
-  })
-  
-  // Clear the effect queue after execution
-  effectQueue.length = 0
-  
-  // Reset effect order after execution
-  effectOrder.set(element, 0)
+  }
 }
 
 /**
  * Executes a callback with a hook context for the given element
  * @param {HTMLElement} element - The component/directive element
  * @param {Function} callback - The callback to execute
+ * @param {string} [name] - A stable name (hook/component name) used to namespace
+ *   this context's effect identity. Distinct names on the same element keep
+ *   their effects separate; the same name reuses effect identity across re-runs.
  * @returns {*} - The result of the callback
  */
-export const withHookContext = (element, callback) => {
-  const context = createHookContext(element)
+export const withHookContext = (element, callback, name) => {
+  const context = createHookContext(element, name)
   hookContextStack.push(context)
   
   return tryCatch({
@@ -199,53 +221,74 @@ const runCleanup = (cleanup) => {
 }
 
 /**
- * React-like useEffect hook with signal dependency tracking
+ * Warns about dependencies that are not signals (they won't trigger re-runs)
+ * @param {Array} dependencies - The dependency array passed to useEffect
+ */
+const warnNonSignalDeps = (dependencies) => {
+  if (!isNonEmptyArray(dependencies)) return
+
+  const nonSignalDeps = dependencies.filter(dep => !isSignal(dep) && !isNil(dep))
+  if (isEmptyArray(nonSignalDeps)) return
+
+  const { debug } = getConfig()
+  const formatValue = (val) => isObject(val) ?
+    JSON.stringify(val).slice(0, 50) : String(val)
+
+  const debugInfo = debug ?
+    `\n  Non-reactive values: ${nonSignalDeps.map(formatValue).join(', ')}` : ''
+
+  logger.warn(
+    `useEffect dependency array contains ${nonSignalDeps.length} non-signal value(s) that won't trigger re-runs.` +
+    `\n  To make values reactive, convert them to signals with signal().${debugInfo}`
+  )
+}
+
+/**
+ * React-like useEffect hook with signal dependency tracking.
+ *
+ * Inside a component/directive context the effect is queued and executed when
+ * the context finishes, with cleanups/subscriptions tracked per element for
+ * teardown. Outside any context the effect runs immediately, subscribes to its
+ * signal dependencies manually, and returns a combined cleanup that runs the
+ * effect's teardown and unsubscribes — so no-context behavior is uniform and
+ * stays reactive (see #42).
+ *
  * @param {Function} setupFn - Setup function that may return a cleanup function
  * @param {Array} dependencies - Array of dependencies (empty array for one-time effects)
+ * @returns {Function|undefined} - Outside a context: a cleanup function. Inside a context: undefined.
  */
 export const useEffect = (setupFn, dependencies) => {
   const context = getCurrentContext()
-  
-  if (!context) {
-    logger.warn('useEffect called outside component/directive context')
-    return
-  }
-  
+
   // Throw an error if dependencies array is not provided
   if (isNil(dependencies)) {
     throw new Error('[HookTML] useEffect requires a dependencies array. For one-time effects, use an empty array [].')
   }
-  
+
   // Ensure dependencies is an array
   if (!isArray(dependencies)) {
     throw new Error('[HookTML] useEffect dependencies must be an array.')
   }
-  
-  const { element } = context
-  
-  // Get current effect order for this element
-  const currentOrder = effectOrder.get(element) || 0
-  effectOrder.set(element, currentOrder + 1)
-  
+
   // Check for non-signal dependencies and warn developers
-  if (isNonEmptyArray(dependencies)) {
-    const nonSignalDeps = dependencies.filter(dep => !isSignal(dep) && !isNil(dep))
-    
-    if (!isEmptyArray(nonSignalDeps)) {
-      const { debug } = getConfig()
-      const formatValue = (val) => isObject(val) ? 
-        JSON.stringify(val).slice(0, 50) : String(val)
-      
-      const debugInfo = debug ? 
-        `\n  Non-reactive values: ${nonSignalDeps.map(formatValue).join(', ')}` : ''
-      
-      logger.warn(
-        `useEffect dependency array contains ${nonSignalDeps.length} non-signal value(s) that won't trigger re-runs.` +
-        `\n  To make values reactive, convert them to signals with signal().${debugInfo}`
-      )
-    }
+  warnNonSignalDeps(dependencies)
+
+  // Outside a hook context: apply immediately, subscribe to signal deps
+  // manually, and return a combined cleanup. This keeps no-context usage of
+  // useEffect (and the hooks built on it) reactive and uniform.
+  if (!context) {
+    logger.warn('useEffect called outside component/directive context')
+    return runDetachedEffect(setupFn, dependencies)
   }
-  
+
+  const { element } = context
+
+  // Assign this effect a stable identity within its context. The order counter
+  // lives on the context object, so two directives on the same element each
+  // start at 0 without colliding, and the key is namespaced by the context name.
+  const currentOrder = context.effectOrder++
+  const effectKey = getEffectKey(context, currentOrder)
+
   // Create effect wrapper that handles signal subscriptions
   const effectWrapper = () => {
     // Get or create subscription map for this element
@@ -254,18 +297,18 @@ export const useEffect = (setupFn, dependencies) => {
       elementSubs = new Map()
       effectSubscriptions.set(element, elementSubs)
     }
-    
-    // Get or create subscription set for this effect order
-    let effectSubs = elementSubs.get(currentOrder)
+
+    // Get or create subscription set for this effect
+    let effectSubs = elementSubs.get(effectKey)
     if (!effectSubs) {
       effectSubs = new Set()
-      elementSubs.set(currentOrder, effectSubs)
+      elementSubs.set(effectKey, effectSubs)
     }
-    
+
     // Clean up old subscriptions
     effectSubs.forEach(unsub => unsub())
     effectSubs.clear()
-    
+
     // Set up new subscriptions for signal dependencies
     dependencies.forEach(dep => {
       if (isSignal(dep)) {
@@ -276,7 +319,7 @@ export const useEffect = (setupFn, dependencies) => {
         effectSubs.add(unsubscribe)
       }
     })
-    
+
     // Run the actual effect
     const runEffect = () => {
       // Get existing cleanups for this element
@@ -285,29 +328,108 @@ export const useEffect = (setupFn, dependencies) => {
         elementCleanups = new Map()
         effectCleanups.set(element, elementCleanups)
       }
-      
-      // Run existing cleanup for this effect order if it exists
-      const existingCleanup = elementCleanups.get(currentOrder)
+
+      // Run existing cleanup for this effect if it exists
+      const existingCleanup = elementCleanups.get(effectKey)
       if (isFunction(existingCleanup)) {
         runCleanup(existingCleanup)
       }
-      
+
       // Run the new effect
       const cleanup = setupFn()
-      
+
       // If the effect returns a cleanup function, store it
       if (isFunction(cleanup)) {
-        elementCleanups.set(currentOrder, cleanup)
+        elementCleanups.set(effectKey, cleanup)
       }
-      
+
       return cleanup
     }
-    
+
     return runEffect()
   }
-  
+
+  // Tag the wrapper with its identity so the queue drain can dedupe/track it.
+  effectWrapper.__effectKey = effectKey
+
   // Queue the effect for execution
   context.effectQueue.push(effectWrapper)
+}
+
+/**
+ * Runs an effect outside of any hook context: applies it immediately,
+ * subscribes to its signal dependencies so it stays reactive, and returns a
+ * combined cleanup that runs the latest teardown and unsubscribes.
+ * @param {Function} setupFn - Setup function that may return a cleanup function
+ * @param {Array} dependencies - Array of dependencies
+ * @returns {Function} - Combined cleanup function
+ */
+const runDetachedEffect = (setupFn, dependencies) => {
+  let currentCleanup
+
+  const runEffect = () => {
+    // Run the previous teardown before re-running the effect
+    if (isFunction(currentCleanup)) {
+      runCleanup(currentCleanup)
+    }
+    currentCleanup = setupFn()
+  }
+
+  // Initial application
+  runEffect()
+
+  // Subscribe to signal dependencies so the effect stays reactive
+  const unsubscribes = []
+  dependencies.forEach(dep => {
+    if (isSignal(dep)) {
+      unsubscribes.push(dep.subscribe(() => runEffect()))
+    }
+  })
+
+  // Combined cleanup: unsubscribe, then run the latest teardown
+  return () => {
+    unsubscribes.forEach(unsub => unsub())
+    unsubscribes.length = 0
+    if (isFunction(currentCleanup)) {
+      runCleanup(currentCleanup)
+      currentCleanup = undefined
+    }
+  }
+}
+
+/**
+ * Registers a component/directive-scoped cleanup function from within a hook
+ * context. The cleanup is run (and cleared) by runCleanupFunctions when the
+ * element is torn down. This is the mechanism with()-chain hooks and other
+ * hooks use to auto-register their teardown.
+ * @param {Function} fn - The cleanup function to register
+ * @returns {void}
+ */
+export const onCleanup = (fn) => {
+  if (!isFunction(fn)) {
+    logger.warn('onCleanup expects a function')
+    return
+  }
+
+  const context = getCurrentContext()
+
+  if (!context) {
+    logger.warn('onCleanup called outside component/directive context')
+    return
+  }
+
+  const { element } = context
+
+  // Track on the context object for introspection...
+  context.cleanups.push(fn)
+
+  // ...and merge into per-element storage so teardown finds it.
+  let elementCleanups = componentCleanups.get(element)
+  if (!elementCleanups) {
+    elementCleanups = []
+    componentCleanups.set(element, elementCleanups)
+  }
+  elementCleanups.push(fn)
 }
 
 /**
@@ -349,10 +471,9 @@ export const runCleanupFunctions = (element) => {
     hasCleanups = true
   }
   
-  // Remove effect order and initialization state
-  effectOrder.delete(element)
+  // Remove effect initialization state (effect order lives on the context object)
   initializedEffects.delete(element)
-  
+
   return hasCleanups
 }
 

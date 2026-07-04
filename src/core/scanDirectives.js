@@ -96,13 +96,15 @@ export const processElementHooks = (element) => {
         fn: () => {
           logger.log(`Calling hook function for "${hookName}" with hook context`)
 
-          // Execute the hook function within a hook context to support useEffect
+          // Execute the hook function within a hook context to support useEffect.
+          // Pass hookName so each directive's effects get a stable, distinct
+          // identity on the element (two directives no longer collide — #14).
           resultRef.current = withHookContext(element, () => {
             const instance = hookFn(element, props)
             // Store the hook instance for future reference
             storeHookInstance(element, hookName, instance)
             return instance
-          })
+          }, hookName)
 
           logger.log(`Hook "${hookName}" returned:`, resultRef.current, typeof resultRef.current)
         },

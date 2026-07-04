@@ -4,7 +4,7 @@ import {
   getRegisteredHooks,
   getRegisteredChainableHooks
 } from './core/hookRegistry.js'
-import { useEffect } from './core/hookContext.js'
+import { useEffect, onCleanup } from './core/hookContext.js'
 import { useChildren } from './hooks/useChildren.js'
 import { useEvents } from './hooks/useEvents.js'
 import { useClasses } from './hooks/useClasses.js'
@@ -108,6 +108,7 @@ export {
   registerHook,
   registerChainableHook,
   useEffect,
+  onCleanup,
   useChildren,
   useEvents,
   useClasses,
