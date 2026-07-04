@@ -28,10 +28,12 @@ const defaultConfig = {
 }
 
 /**
- * Current runtime configuration
+ * Current runtime configuration.
+ * Frozen so `getConfig()` can hand back a stable reference without cloning
+ * on every call (see issue #32).
  * @type {HookTMLConfig}
  */
-let config = { ...defaultConfig }
+let config = Object.freeze({ ...defaultConfig })
 
 /**
  * Format the attribute prefix to ensure it has a trailing dash
@@ -54,11 +56,20 @@ export const initConfig = (options = {}) => {
     normalizedOptions.formattedPrefix = formatPrefix(normalizedOptions.attributePrefix)
   }
 
-  config = { ...defaultConfig, ...normalizedOptions }
+  config = Object.freeze({ ...defaultConfig, ...normalizedOptions })
 }
 
 /**
- * Get the current runtime configuration
+ * Get the current runtime configuration.
+ * Returns a stable, frozen reference — callers must not mutate it. This avoids
+ * allocating a fresh clone on every call (issue #32).
  * @returns {HookTMLConfig}
  */
-export const getConfig = () => ({ ...config })
+export const getConfig = () => config
+
+/**
+ * Read the `debug` flag directly without materialising the whole config.
+ * Used by the logger to gate suppressed log lines without cloning (issue #32).
+ * @returns {boolean}
+ */
+export const isDebug = () => config.debug
