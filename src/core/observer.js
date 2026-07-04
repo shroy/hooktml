@@ -232,9 +232,19 @@ const createHookTMLDelegate = () => {
       return []
     }
 
-    // Find all matching elements
-    return Array.from(root.querySelectorAll(selectors.join(', ')))
-      .filter(isHTMLElement)
+    // Find all matching elements. Guard querySelectorAll so a malformed
+    // selector (e.g. from a bad attribute prefix) can never throw inside the
+    // MutationObserver callback and permanently break observation (issue #33).
+    const selector = selectors.join(', ')
+    return tryCatch({
+      fn: () => Array.from(root.querySelectorAll(selector)).filter(isHTMLElement),
+      onError: (error) => {
+        if (getConfig().debug) {
+          logger.error(`Invalid element selector "${selector}":`, error)
+        }
+        return []
+      }
+    })
   }
 
   /**
