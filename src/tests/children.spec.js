@@ -21,9 +21,10 @@ test('should extract children correctly', () => {
   // Execute
   const children = extractChildren(dialog, 'Dialog')
 
-  // Verify
+  // Verify — unified shape: every suffix exposes both singular and plural keys
   expect(children).toEqual({
     header,
+    headers: [header],
     item: item1,
     items: [item1, item2]
   })
@@ -45,7 +46,9 @@ test('should handle multi-word component names with kebab-case attributes', () =
 
   expect(children).toEqual({
     input,
-    submit: button
+    inputs: [input],
+    submit: button,
+    submits: [button]
   })
 })
 
@@ -71,7 +74,8 @@ test('should handle nested components', () => {
 
   // Verify
   expect(children).toEqual({
-    header
+    header,
+    headers: [header]
   })
 })
 
@@ -99,12 +103,14 @@ test('should handle mixed single and multiple children', () => {
   // Execute
   const children = extractChildren(dialog, 'Dialog')
 
-  // Verify
+  // Verify — unified shape: single children also expose a plural key
   expect(children).toEqual({
     header,
+    headers: [header],
     item: item1,
     items: [item1, item2],
-    footer
+    footer,
+    footers: [footer]
   })
 })
 
@@ -139,8 +145,9 @@ test('should NOT extract children from nested components', () => {
   const children = extractChildren(outerDialog, 'Dialog')
 
   expect(children).toEqual({
-    header: directChild
+    header: directChild,
+    headers: [directChild]
   })
   expect(children.content).toBeUndefined()
   expect(children.footer).toBeUndefined()
-}) 
+})
