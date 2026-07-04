@@ -125,6 +125,25 @@ export const createHookContext = (element, name) => {
 }
 
 /**
+ * Registers an element-scoped cleanup function that runs on teardown via
+ * runCleanupFunctions (from the observer's removeElement and refresh paths).
+ *
+ * This lets subsystems that outlive a single hook context (e.g. children watchers
+ * in the observer) tie their disposal to the element's lifecycle instead of relying
+ * on the MutationObserver stream, which is silent while the observer is stopped,
+ * paused, or never started.
+ *
+ * @param {HTMLElement} element - The element to associate the cleanup with
+ * @param {Function} cleanup - The cleanup function to run on teardown
+ */
+export const registerCleanup = (element, cleanup) => {
+  if (!isFunction(cleanup)) return
+
+  const existingCleanups = componentCleanups.get(element) || []
+  componentCleanups.set(element, [...existingCleanups, cleanup])
+}
+
+/**
  * Gets the current hook context
  * @returns {Object|null} - The current hook context or null
  */

@@ -1,5 +1,5 @@
 import { lifecycleManager } from './initialization.js'
-import { runCleanupFunctions } from './hookContext.js'
+import { runCleanupFunctions, registerCleanup } from './hookContext.js'
 import { isEmptyArray, isHTMLElement, isNonEmptyArray } from '../utils/type-guards.js'
 import { getConfig } from './config.js'
 import { tryCatch } from '../utils/try-catch.js'
@@ -306,6 +306,13 @@ export const registerChildrenWatcher = (element, prefix, callback) => {
 
   const cleanups = childrenCleanup.get(element) || []
   childrenCleanup.set(element, [...cleanups, cleanup])
+
+  // Also tie disposal to the element's lifecycle via the shared, element-scoped
+  // cleanup path (runCleanupFunctions). The childrenCleanup WeakMap above only runs
+  // from the live MutationObserver removal branch, which is silent when the observer
+  // is stopped / paused / never started — so on its own it strongly leaks the watcher
+  // (and its element) in those cases (BUG-17).
+  registerCleanup(element, cleanup)
 }
 
 /**
@@ -317,8 +324,17 @@ const triggerChildrenWatchers = (elements) => {
 
   elements.forEach(element => {
     childrenWatchers.forEach(watcher => {
+      // Sweep out watchers whose element has left the DOM. Disposal is normally
+      // driven by the element lifecycle (runCleanupFunctions) / the mutation stream,
+      // but if a detached element is never routed through either, this guard prevents
+      // a stale watcher from firing for a dead element (BUG-17).
+      if (!watcher.element.isConnected) {
+        childrenWatchers.delete(watcher)
+        return
+      }
+
       // Check if this element is a descendant of or is the watched element
-      if (watcher.element === element || (watcher.element.isConnected && watcher.element.contains(element))) {
+      if (watcher.element === element || watcher.element.contains(element)) {
         if (!triggeredWatchers.has(watcher)) {
           triggeredWatchers.add(watcher)
           tryCatch({
