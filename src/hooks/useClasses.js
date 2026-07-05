@@ -88,15 +88,22 @@ export const useClasses = (elementOrElements, classMap, deps = []) => {
   // Initial application of classes
   updateClasses()
 
-  // Set up reactive updates if any signals were provided
+  // Set up reactive updates if any signals were provided. useEffect keeps the
+  // classes reactive both inside a hook context (queued + tracked for teardown)
+  // and outside one (applies + subscribes immediately, returning a combined
+  // cleanup we capture below).
+  let effectCleanup
   if (isNonEmptyArray(allDeps)) {
-    useEffect(() => {
+    effectCleanup = useEffect(() => {
       updateClasses()
     }, allDeps)
   }
 
   // Return cleanup function
   return () => {
+    // Tear down any effect subscriptions set up outside a hook context
+    if (isFunction(effectCleanup)) effectCleanup()
+
     elements.forEach(element => {
       const addedClasses = addedClassesPerElement.get(element)
       if (addedClasses) {
@@ -107,4 +114,4 @@ export const useClasses = (elementOrElements, classMap, deps = []) => {
       }
     })
   }
-} 
+}

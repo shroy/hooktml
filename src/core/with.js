@@ -10,6 +10,19 @@ import { useAttributes } from '../hooks/useAttributes.js'
 import { useStyles } from '../hooks/useStyles.js'
 import { useText } from '../hooks/useText.js'
 import { getRegisteredChainableHooks } from './hookRegistry.js'
+import { onCleanup } from './hookContext.js'
+
+/**
+ * Forwards a hook's returned cleanup into the active hook context so it is
+ * reclaimed on teardown. Hooks that return no cleanup are ignored.
+ * @param {*} cleanup - The value returned by the hook (a cleanup fn or not)
+ * @returns {void}
+ */
+const registerCleanup = (cleanup) => {
+  if (isFunction(cleanup)) {
+    onCleanup(cleanup)
+  }
+}
 
 /**
  * @typedef {Object} WithChain
@@ -38,7 +51,7 @@ const with_ = (element) => {
      * @returns {WithChain} The chainable object for further operations
      */
     useEvents: (eventMap) => {
-      useEvents(element, eventMap)
+      registerCleanup(useEvents(element, eventMap))
       return chain
     },
 
@@ -48,7 +61,7 @@ const with_ = (element) => {
      * @returns {WithChain} The chainable object for further operations
      */
     useClasses: (classMap) => {
-      useClasses(element, classMap)
+      registerCleanup(useClasses(element, classMap))
       return chain
     },
 
@@ -58,7 +71,7 @@ const with_ = (element) => {
      * @returns {WithChain} The chainable object for further operations
      */
     useAttributes: (attrMap) => {
-      useAttributes(element, attrMap)
+      registerCleanup(useAttributes(element, attrMap))
       return chain
     },
 
@@ -68,7 +81,7 @@ const with_ = (element) => {
      * @returns {WithChain} The chainable object for further operations
      */
     useStyles: (styleMap) => {
-      useStyles(element, styleMap)
+      registerCleanup(useStyles(element, styleMap))
       return chain
     },
 
@@ -78,7 +91,7 @@ const with_ = (element) => {
      * @returns {WithChain} The chainable object for further operations
      */
     useText: (textFunction) => {
-      useText(element, textFunction)
+      registerCleanup(useText(element, textFunction))
       return chain
     }
   }
@@ -95,7 +108,7 @@ const with_ = (element) => {
        * @returns {WithChain} The chainable object for further operations
        */
       chain[hookName] = (...args) => {
-        hookFn(element, ...args)
+        registerCleanup(hookFn(element, ...args))
         return chain
       }
     }

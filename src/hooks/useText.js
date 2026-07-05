@@ -1,13 +1,13 @@
-import { useEffect } from "../core/hookContext"
-import { logger } from "../utils/logger"
-import { isFunction, isHTMLElement, isNil } from "../utils/type-guards"
+import { useEffect } from "../core/hookContext.js"
+import { logger } from "../utils/logger.js"
+import { isFunction, isHTMLElement, isNil } from "../utils/type-guards.js"
 
 /**
  * Hook for setting text content on an element
  * @param {HTMLElement} element - The element to set text content on
  * @param {() => string} textFunction - Function that returns the text content to set
  * @param {any[]} [deps=[]] - Dependencies array for the effect
- * @returns {void}
+ * @returns {Function|void} - Outside a hook context, a cleanup that unsubscribes; otherwise void
  */
 export const useText = (element, textFunction, deps = []) => {
   if (isNil(element)) {
@@ -25,7 +25,9 @@ export const useText = (element, textFunction, deps = []) => {
     return
   }
 
-  useEffect(() => {
+  // useEffect applies the text immediately and stays reactive to signal deps
+  // both inside a hook context and outside one (returning a cleanup we forward).
+  return useEffect(() => {
     element.textContent = textFunction()
   }, deps)
 }

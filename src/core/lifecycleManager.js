@@ -235,6 +235,13 @@ export class LifecycleManager {
     const componentResult = this.executeComponentTeardown(element)
     const directiveResults = this.executeDirectiveTeardowns(element)
 
+    // Remove the public component API mirrored onto the element (set via
+    // Object.defineProperty in initializeComponents). Leaving it in place keeps the
+    // detached element's closed-over context/signals reachable, i.e. a leak (BUG-16).
+    if ('component' in element) {
+      delete element.component
+    }
+
     // Clean up registration and state
     this.teardownRegistry.delete(element)
     this.stateManager.clearState(element)
@@ -279,6 +286,25 @@ export class LifecycleManager {
    */
   markInitialized(element) {
     this.stateManager.markInitialized(element)
+  }
+
+  /**
+   * Marks a directive as initialized for an element (convenience method)
+   * @param {HTMLElement} element - The DOM element
+   * @param {string} directiveName - The name of the directive
+   */
+  markDirectiveInitialized(element, directiveName) {
+    this.stateManager.markDirectiveInitialized(element, directiveName)
+  }
+
+  /**
+   * Clears the initialized flag for a single directive on an element without
+   * tearing down or removing its teardown registration (convenience method).
+   * @param {HTMLElement} element - The DOM element
+   * @param {string} directiveName - The name of the directive
+   */
+  clearDirectiveInitialized(element, directiveName) {
+    this.stateManager.clearDirectiveInitialized(element, directiveName)
   }
 
   /**

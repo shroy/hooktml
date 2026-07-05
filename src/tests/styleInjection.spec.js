@@ -45,13 +45,13 @@ describe('styleInjection', () => {
     expect(styleTag).toBeInstanceOf(HTMLStyleElement)
     
     if (styleTag instanceof HTMLStyleElement) {
-      expect(styleTag.textContent).toBe('[data-hooktml-cloak] { visibility: hidden; }')
-      
+      expect(styleTag.textContent).toBe('[data-hooktml-cloak] { display: none !important; }')
+
       // Check that the component style was added to the stylesheet
       const sheet = styleTag.sheet
       if (sheet) {
         expect(sheet.cssRules.length).toBe(2)
-        expect(sheet.cssRules[0].cssText).toBe('[data-hooktml-cloak] {visibility: hidden;}')
+        expect(sheet.cssRules[0].cssText).toBe('[data-hooktml-cloak] {display: none !important;}')
         expect(sheet.cssRules[1].cssText).toBe('.TestComponent {color: red;}')
       }
     }
@@ -119,7 +119,7 @@ describe('styleInjection', () => {
     // Create a manual stylesheet with a specific rule
     const styleTag = document.createElement('style')
     styleTag.id = '__hooktml'
-    styleTag.textContent = '[data-hooktml-cloak] { visibility: hidden; }'
+    styleTag.textContent = '[data-hooktml-cloak] { display: none !important; }'
     document.head.appendChild(styleTag)
     
     // Add a rule with spaces after colons

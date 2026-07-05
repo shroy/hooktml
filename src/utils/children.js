@@ -17,27 +17,14 @@ export const hasSameComponent = (element, componentName) => {
 }
 
 /**
- * Adds a child to a pluralized key
- * @param {Record<string, Element | Element[]>} children - The children object
- * @param {string} key - The key to add the child to
- * @param {Element} child - The child to add
- */
-export const addPluralizedChild = (children, key, child) => {
-  const pluralKey = pluralize(key)
-
-  if (pluralKey in children) {
-    // If the pluralized key already exists, just push the new child
-    if (isArray(children[pluralKey])) {
-      children[pluralKey].push(child)
-    }
-  } else {
-    // Create a new array with first child and new child
-    children[pluralKey] = [/** @type {Element} */(children[key]), child]
-  }
-}
-
-/**
- * Extracts children from an element's subtree based on component name
+ * Extracts children from an element's subtree based on component name.
+ *
+ * Mirrors the shape produced by `useChildren`: every matched marker suffix
+ * yields BOTH a singular key (first element found) and a plural key (array of
+ * all elements found). Elements that live inside a nested same-name component
+ * are skipped per-descendant (not aborting the scan) so root-level markers that
+ * follow a nested component are still collected.
+ *
  * @param {Element} element - The root element
  * @param {string} componentName - The PascalCase component name
  * @returns {Record<string, Element | Element[]>} The extracted children
@@ -45,32 +32,61 @@ export const addPluralizedChild = (children, key, child) => {
 export const extractChildren = (element, componentName) => {
   const { formattedPrefix } = getConfig()
   const prefix = `${formattedPrefix}${camelToKebab(componentName)}-`
+  const componentSelector = `.${componentName}, [${formattedPrefix}use-component="${componentName}"]`
+
   /** @type {Record<string, Element | Element[]>} */
   const children = {}
 
-  // Get all descendants
+  // Track elements for each suffix to build both singular and plural keys
+  /** @type {Record<string, Element[]>} */
+  const elementsByKey = {}
+
+  // Get all descendants in document order
   const descendants = Array.from(element.getElementsByTagName('*'))
 
-  // Use some to short-circuit when the component is found
-  descendants.some((child) => {
-    if (hasSameComponent(child, componentName)) {
-      return true
-    }
-    // Check all attributes
-    Array.from(child.attributes).forEach(({ name }) => {
+  for (const child of descendants) {
+    // Skip elements that belong to a nested same-name component. The nested
+    // component itself, or anything scoped inside it, resolves via closest()
+    // to a component element other than the root — skip only those.
+    const closestComponent = child.closest(componentSelector)
+    if (closestComponent && closestComponent !== element) continue
+
+    // Collect matching markers for this element
+    for (const { name } of Array.from(child.attributes)) {
       if (name.startsWith(prefix)) {
         const key = kebabToCamel(name.slice(prefix.length))
-
-        if (children[key]) {
-          addPluralizedChild(children, key, child)
-        } else {
-          children[key] = child
+        if (!isArray(elementsByKey[key])) {
+          elementsByKey[key] = []
         }
+        elementsByKey[key].push(child)
       }
-    })
+    }
+  }
 
-    return false
+  // Emit both singular and plural keys for every matched suffix (unified shape
+  // with useChildren). Two passes so pluralization collisions never drop an
+  // element (e.g. `box` pluralizes to `boxes`, which may also be a literal
+  // marker): plural slots are populated first as arrays (merging colliding
+  // suffixes), then singular slots fill only keys not already taken by an array.
+  const keys = Object.keys(elementsByKey)
+
+  keys.forEach((key) => {
+    const pluralKey = pluralize(key)
+    const existing = children[pluralKey]
+    if (isArray(existing)) {
+      elementsByKey[key].forEach((el) => {
+        if (!existing.includes(el)) existing.push(el)
+      })
+    } else {
+      children[pluralKey] = [...elementsByKey[key]]
+    }
+  })
+
+  keys.forEach((key) => {
+    if (!isArray(children[key])) {
+      children[key] = elementsByKey[key][0]
+    }
   })
 
   return children
-} 
+}

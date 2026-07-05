@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { signal } from '../core/signal.js'
 import { useEffect, withHookContext } from '../core/hookContext.js'
+import * as configModule from '../core/config.js'
 
 describe('useEffect Non-Signal Warning', () => {
   let container
@@ -73,18 +74,19 @@ describe('useEffect Non-Signal Warning', () => {
   })
   
   it('should include debugging info when debug mode is enabled', () => {
-    // Mock getConfig to return debug: true
-    vi.mock('../core/config.js', () => ({
-      getConfig: () => ({ debug: true })
-    }))
-    
+    // Enable debug mode via a runtime spy on getConfig. (The previous `vi.mock(...)`
+    // call sat inside the test body, where vitest hoists it out of scope so it never
+    // took effect; the resulting AssertionError was then swallowed by withHookContext
+    // and the test passed vacuously — see #45.)
+    vi.spyOn(configModule, 'getConfig').mockReturnValue({ debug: true })
+
     const plainObject = { test: 'value' }
     const plainNumber = 42
-    
+
     withHookContext(container, () => {
       useEffect(() => {}, [plainObject, plainNumber])
     })
-    
+
     // Should include non-reactive values in the warning
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Non-reactive values:')

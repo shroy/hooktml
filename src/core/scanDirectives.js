@@ -7,7 +7,7 @@ import { lifecycleManager } from './initialization.js'
 import { withHookContext } from './hookContext.js'
 import { logger } from '../utils/logger.js'
 import { getConfig } from './config.js'
-import { getHookInstance, storeHookInstance } from './hookInstanceRegistry.js'
+import { storeHookInstance } from './hookInstanceRegistry.js'
 
 /**
  * Creates a combined selector for all registered hooks
@@ -34,9 +34,12 @@ const createHookSelector = (hookNames, prefix = '') => {
 const getHookAttributesFromElement = (element, prefix = '') => {
   const attributes = Array.from(element.attributes)
   const usePrefix = `${prefix}use-`
+  // The `use-component` attribute is a reserved component-binding, not a hook.
+  // Excluding it here prevents a spurious "Unknown hook useComponent" warning.
+  const componentAttr = `${prefix}use-component`
 
   return attributes
-    .filter(attr => attr.name.startsWith(usePrefix))
+    .filter(attr => attr.name.startsWith(usePrefix) && attr.name !== componentAttr)
     .map(attr => ({
       name: attr.name.substring(prefix.length), // Remove prefix for processing
       originalName: attr.name, // Keep original for logging
@@ -45,18 +48,34 @@ const getHookAttributesFromElement = (element, prefix = '') => {
 }
 
 /**
+ * Resolves the registered hook name for a kebab-case attribute name.
+ *
+ * `camelToKebab`/`kebabToCamel` are not inverses for names containing
+ * acronyms: `camelToKebab('useURLParser')` -> 'use-urlparser', but
+ * `kebabToCamel('use-urlparser')` -> 'useUrlparser', which never matches the
+ * registered name. Since the selector is built from `camelToKebab(name)`, we
+ * resolve back to the true registered name by matching each registered name's
+ * kebab form against the attribute (issue #40). The plain `kebabToCamel`
+ * result is used as a fast path for the common (non-acronym) case.
+ * @param {string} kebabName - The hook attribute name without prefix (e.g. 'use-tooltip')
+ * @returns {string} The resolved registered hook name
+ */
+const resolveRegisteredHookName = (kebabName) => {
+  const direct = kebabToCamel(kebabName)
+  if (isNotNil(getRegisteredHook(direct))) return direct
+
+  for (const registeredName of getRegisteredHooks().keys()) {
+    if (camelToKebab(registeredName) === kebabName) return registeredName
+  }
+
+  return direct
+}
+
+/**
  * Processes a single element, applying all hooks defined on it
  * @param {HTMLElement} element - The DOM element to process
  */
 export const processElementHooks = (element) => {
-  // Skip if already processed - prevents infinite loop
-  const hasTeardowns = lifecycleManager.hasRegistration(element)
-
-  if (hasTeardowns) {
-    logger.log('⏭️ Skipping already processed element', element)
-    return
-  }
-
   const { formattedPrefix } = getConfig()
   const hookAttributes = getHookAttributesFromElement(element, formattedPrefix)
 
@@ -64,9 +83,11 @@ export const processElementHooks = (element) => {
 
   // For each hook attribute, find and call the corresponding function
   hookAttributes.forEach(({ name, originalName, value }) => {
-    // Properly capitalize the hook name (e.g., "teardown" -> "useTeardown")
-    // Must use exact case to match registered hook
-    const hookName = kebabToCamel(name)
+    // Resolve the registered hook name from the kebab attribute. Uses the
+    // plain kebabToCamel result as a fast path, then falls back to matching
+    // registered names by their kebab form so acronym hooks (e.g.
+    // useURLParser -> use-urlparser) resolve correctly (issue #40).
+    const hookName = resolveRegisteredHookName(name)
 
     logger.log(`Looking for hook "${hookName}" from attribute "${originalName}"`)
 
@@ -75,12 +96,21 @@ export const processElementHooks = (element) => {
     if (isNotNil(hookFn) && isFunction(hookFn)) {
       logger.log(`Found hook "${hookName}" for element:`, element)
 
-      // Check if we already have an instance for this hook
-      const existingInstance = getHookInstance(element, hookName)
-      if (existingInstance) {
-        logger.log(`Using existing instance for hook "${hookName}"`)
-        return // Skip re-initialization
+      // Skip if this specific directive has already been initialized on this
+      // element. Guarding on directive-initialized state (rather than on the
+      // presence of a teardown/instance) means a hook that returns neither a
+      // teardown nor a truthy instance still runs exactly once, and other
+      // directives on the same element are never skipped wholesale. (#23)
+      if (lifecycleManager.isDirectiveInitialized(element, hookName)) {
+        logger.log(`Directive "${hookName}" already initialized; skipping`)
+        return
       }
+
+      // Mark-before-run: flag the directive as initialized immediately, so a
+      // reentrant scan() triggered from within the hook body cannot
+      // double-initialize it. Cleared in the error path below so a failed hook
+      // can be retried on a later scan. (#25)
+      lifecycleManager.markDirectiveInitialized(element, hookName)
 
       // Extract all props for this hook (including main value and additional props)
       const props = extractHookProps(element, hookName, value)
@@ -96,18 +126,24 @@ export const processElementHooks = (element) => {
         fn: () => {
           logger.log(`Calling hook function for "${hookName}" with hook context`)
 
-          // Execute the hook function within a hook context to support useEffect
+          // Execute the hook function within a hook context to support useEffect.
+          // Pass hookName so each directive's effects get a stable, distinct
+          // identity on the element (two directives no longer collide — #14).
           resultRef.current = withHookContext(element, () => {
             const instance = hookFn(element, props)
             // Store the hook instance for future reference
             storeHookInstance(element, hookName, instance)
             return instance
-          })
+          }, hookName)
 
           logger.log(`Hook "${hookName}" returned:`, resultRef.current, typeof resultRef.current)
         },
         onError: (error) => {
           logger.error(`Error applying hook "${hookName}":`, error)
+          // Roll back the mark-before-run flag so a failed hook can be retried
+          // on a later scan. No partial instance can exist here because
+          // storeHookInstance only runs after the hook body returns.
+          lifecycleManager.clearDirectiveInitialized(element, hookName)
         }
       })
 
@@ -148,10 +184,17 @@ export const scanDirectives = () => {
 
   logger.log(`Scanning DOM for hook directives with selector: "${selector}"`)
 
-  // Find all elements with use-* attributes and ensure they are HTMLElements
+  // Find all elements with use-* attributes and ensure they are HTMLElements.
+  // Guard querySelectorAll so a malformed selector (e.g. from a bad attribute
+  // prefix) can never throw out of a scan and break observation (issue #33).
   /** @type {HTMLElement[]} */
-  const elements = Array.from(document.querySelectorAll(selector))
-    .filter(isHTMLElement)
+  const elements = tryCatch({
+    fn: () => Array.from(document.querySelectorAll(selector)).filter(isHTMLElement),
+    onError: (error) => {
+      logger.error(`Invalid hook selector "${selector}":`, error)
+      return []
+    }
+  })
 
   logger.log(`Found ${elements.length} element(s) with hook directives`)
 

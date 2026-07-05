@@ -4,13 +4,45 @@ import { logger } from '../utils/logger.js'
 
 /**
  * @typedef {Object} AutoRegisterOptions
- * @property {string} componentPath - Directory path to scan for components
+ * @property {string} componentPath - Directory path to scan for components.
+ *   SECURITY: this is a TRUSTED, arbitrary-code-execution input. Every
+ *   component-looking file under this path is `import()`ed, executing its
+ *   top-level module code. Only pass directories you fully control; never a
+ *   value derived from untrusted/user input.
  * @property {Function} [register] - Function to register components with
  * @property {boolean} [debug=false] - Enable debug logging
  */
 
 /**
- * Recursively collects all .js and .ts files from a directory (Node.js only)
+ * Determines whether a file's name looks like a HookTML component file and is
+ * therefore safe to import.
+ *
+ * IMPORTANT: `componentPath` is a TRUSTED, arbitrary-code-execution input by
+ * design — every file that is imported below has its top-level module code
+ * executed for its side effects, and ESM cannot inspect a module's exports
+ * without running it. Only point `componentPath` at directories you control.
+ *
+ * As defense-in-depth we restrict imports to filenames that could actually be
+ * a component: conventional PascalCase files (e.g. `Widget.js`) or kebab/snake
+ * files (e.g. `todo-list.js`) that {@link getExpectedExportName} maps to a
+ * PascalCase name. This skips lowercase single-word files (e.g. `utils.js`,
+ * `index.js`) so their arbitrary top-level code is never executed just by
+ * being present in the directory (issue #35).
+ * @param {string} filePath - Absolute path to a candidate file
+ * @param {{ basename: (p: string, ext?: string) => string, extname: (p: string) => string }} path - Node path module
+ * @returns {boolean} Whether the file may be imported as a component
+ */
+const isImportableComponentFile = (filePath, path) => {
+  if (!filePath.endsWith('.js') && !filePath.endsWith('.ts')) return false
+
+  const base = path.basename(filePath, path.extname(filePath))
+  // PascalCase (starts with an uppercase ASCII letter) or a kebab/snake name.
+  return /^[A-Z]/.test(base) || base.includes('-') || base.includes('_')
+}
+
+/**
+ * Recursively collects all component-looking .js and .ts files from a
+ * directory (Node.js only)
  * @param {string} dir - The directory to scan
  * @returns {Promise<string[]>} Array of file paths
  */
@@ -27,7 +59,7 @@ export const collectComponentFiles = async (dir) => {
 
   return files
     .flat()
-    .filter(file => file.endsWith('.js') || file.endsWith('.ts'))
+    .filter(file => isImportableComponentFile(file, path))
 }
 
 /**
@@ -64,7 +96,12 @@ const processComponentFile = async (filePath, register) => {
   return tryCatchAsync({
     fn: async () => {
       const expectedName = await getExpectedExportName(filePath)
-      const module = await import(/* @vite-ignore */filePath)
+      // Convert the absolute filesystem path to a file:// URL before importing.
+      // A bare absolute path fails on Windows (drive letter + backslashes) with
+      // ERR_UNSUPPORTED_ESM_URL_SCHEME, which would make every file "fail to
+      // import" and register 0 components (issue #35).
+      const { pathToFileURL } = await import('url')
+      const module = await import(/* @vite-ignore */pathToFileURL(filePath).href)
 
       // Check if module has a default export
       if (isNil(module.default)) {
@@ -104,80 +141,6 @@ const processComponentFile = async (filePath, register) => {
 export const loadValidComponents = async (filePaths, register) => {
   const results = await Promise.all(
     filePaths.map(filePath => processComponentFile(filePath, register))
-  )
-
-  return results.filter(Boolean).length
-}
-
-/**
- * Processes a single module entry from bundler glob imports
- * @param {[string, Function]} moduleEntry - [path, moduleLoader] pair
- * @param {Function} register - Registration function
- * @param {boolean} debug - Enable debug logging
- * @returns {Promise<boolean>} Whether the component was successfully registered
- */
-const processBundlerModule = async ([path, moduleLoader], register, debug) => {
-  return tryCatchAsync({
-    fn: async () => {
-      const module = await moduleLoader()
-
-      // Check if module has a default export that's a function
-      if (isNil(module.default) || !isFunction(module.default)) {
-        if (debug) {
-          logger.info(`Skipping ${path}: No valid default export`)
-        }
-        return false
-      }
-
-      // Register the component
-      register(module.default)
-
-      if (debug) {
-        logger.info(`Registered component: ${module.default.name} from ${path}`)
-      }
-
-      return true
-    },
-    onError: (error) => {
-      logger.warn(`Failed to load component from ${path}: ${error.message}`)
-      return false
-    }
-  })
-}
-
-/**
- * Gets bundler modules (limited due to static analysis requirements)
- * @param {string} componentPath - Component directory path
- * @param {boolean} debug - Enable debug logging
- * @returns {Record<string, Function>} Module entries from bundler
- */
-const getBundlerModules = (componentPath, debug) => {
-  if (debug) {
-    logger.warn(`Bundler auto-registration cannot dynamically use componentPath "${componentPath}"`)
-    logger.info('Bundlers require static import patterns. Use Node.js environment for dynamic paths.')
-  }
-
-  return {}
-}
-
-/**
- * Auto-registers components using bundler's glob import (Vite, Webpack, etc.)
- * Note: This requires the bundler to be configured with static glob patterns
- * @param {string} componentPath - Component directory path
- * @param {Function} register - Registration function
- * @param {boolean} debug - Enable debug logging
- * @returns {Promise<number>} Number of components registered
- */
-const autoRegisterWithBundler = async (componentPath, register, debug) => {
-  const modules = getBundlerModules(componentPath, debug)
-  const moduleEntries = Object.entries(modules)
-
-  if (debug) {
-    logger.info(`Found ${moduleEntries.length} potential component files using bundler`)
-  }
-
-  const results = await Promise.all(
-    moduleEntries.map(entry => processBundlerModule(entry, register, debug))
   )
 
   return results.filter(Boolean).length
@@ -242,8 +205,10 @@ export const autoRegisterComponents = async (options) => {
     throw new Error('[HookTML] autoRegisterComponents: componentPath must be a non-empty string')
   }
 
-  // Strategy 1: Node.js filesystem approach
-  if (isNonEmptyObject(process.versions) && process.versions.node) {
+  // Strategy 1: Node.js filesystem approach.
+  // Guard the bare `process` reference so this does not throw a ReferenceError
+  // in a non-Node, non-shimmed browser build (issue #35).
+  if (typeof process !== 'undefined' && isNonEmptyObject(process.versions) && process.versions.node) {
     if (debug) {
       logger.info('Using Node.js filesystem auto-registration')
     }
@@ -251,34 +216,10 @@ export const autoRegisterComponents = async (options) => {
     return await autoRegisterWithNodeJS(options)
   }
 
-  // Strategy 2: Bundler approach (Vite, Webpack, etc.)
-  // @ts-ignore - import.meta.glob is provided by bundlers like Vite
-  if (isFunction(import.meta?.glob)) {
-    if (debug) {
-      logger.info('Using bundler auto-registration')
-    }
-
-    return tryCatchAsync({
-      fn: async () => {
-        const registeredCount = await autoRegisterWithBundler(componentPath, register, debug)
-
-        if (debug) {
-          logger.info(`Successfully registered ${registeredCount} components using bundler`)
-        }
-
-        return registeredCount
-      },
-      onError: (error) => {
-        logger.error(`Error auto-registering components with bundler: ${error.message}`)
-        return 0
-      }
-    })
-  }
-
-  // Strategy 3: Graceful fallback
+  // Strategy 2: Graceful fallback
   if (debug) {
     logger.warn('Auto-registration not supported in this environment. Please register components manually.')
   }
 
   return 0
-} 
+}

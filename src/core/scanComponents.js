@@ -1,7 +1,7 @@
 import { getConfig } from './config.js'
 import { getRegisteredComponent, getRegisteredComponentNames } from './registry.js'
 import { isNotNil, isEmptyArray, isNil, isFunction, isObject } from '../utils/type-guards.js'
-import { lifecycleManager, markInitialized } from './initialization.js'
+import { lifecycleManager, markInitialized, clearInitialized } from './initialization.js'
 import { extractProps } from '../utils/props.js'
 import { withHookContext } from './hookContext.js'
 import { injectComponentStyles } from './styleInjection.js'
@@ -62,31 +62,46 @@ const getComponentNameFromElement = (element, componentNames, prefix = '') => {
 
 /**
  * Scans the DOM for registered components
+ * @param {ParentNode} [root=document] - Root to scan within. Scoping to a
+ *   subtree avoids whole-document scans on incremental updates (issue #31).
  * @returns {FoundComponent[]} Array of found components
  */
-export const scanComponents = () => {
+export const scanComponents = (root = document) => {
   // Keep this original log message for backward compatibility with tests
   logger.log('Scanning for components...')
-  
+
   const componentNames = getRegisteredComponentNames()
   const { formattedPrefix } = getConfig()
-  
+
   // If no components registered, return empty array
   if (!componentNames.length) {
     logger.log('No components registered yet')
     return []
   }
-  
+
   const classSelector = createClassSelector(componentNames)
   const useComponentSelector = createUseComponentSelector(componentNames, formattedPrefix)
   const selector = `${classSelector}, ${useComponentSelector}`
-  
+
   logger.log(`Scanning DOM with selector: "${selector}"`)
-  
-  // Find all matching elements
+
+  // Find all matching elements within the given root.
   /** @type {HTMLElement[]} */
-  const elements = Array.from(document.querySelectorAll(selector))
-  
+  const descendants = Array.from(root.querySelectorAll(selector))
+
+  // `querySelectorAll` only matches descendants, so when scanning a scoped
+  // Element root (issue #31), include the root itself if it matches — otherwise
+  // a component element passed as its own root would be missed.
+  const rootMatches =
+    root !== document &&
+    isFunction(/** @type {any} */ (root).matches) &&
+    /** @type {Element} */ (root).matches(selector)
+
+  /** @type {HTMLElement[]} */
+  const elements = rootMatches
+    ? [/** @type {HTMLElement} */ (root), ...descendants]
+    : descendants
+
   // Map to component objects
   return elements
     .map(element => {
@@ -119,24 +134,36 @@ export const initializeComponents = (components) => {
     }
 
     const componentFn = getRegisteredComponent(componentName)
-    
+
     if (isNil(componentFn)) {
       logger.warn(`No registered function found for component: ${componentName}`)
       return null
     }
-    
+
+    // Mark-before-run: flag the element as initialized immediately, before the
+    // component body runs. A component whose body synchronously triggers a
+    // scan() would otherwise re-enter this loop for the same element before the
+    // flag was set and initialize it twice. Cleared in the error path below so
+    // a component that throws can be retried on a later scan. (#25)
+    markInitialized(element)
+
     return tryCatch({
       fn: () => {
         logger.log(`Initializing component: ${componentName}`)
         const props = extractProps(element, componentName)
         
-        // Run component initialization within a hook context
+        // Run component initialization within a hook context. Pass componentName
+        // so the component's effects get a stable, distinct identity on the
+        // element (a component + a directive on one element no longer collide).
         const result = withHookContext(element, () => {
           return componentFn(element, props)
-        })
+        }, componentName)
       
-        // If the hook context returned null due to an error, return null
+        // If the hook context returned null due to an error, roll back the
+        // mark-before-run flag so the component can be retried on a later scan,
+        // then return null.
         if (result === null) {
+          clearInitialized(element)
           return null
         }
       
@@ -166,18 +193,21 @@ export const initializeComponents = (components) => {
       
         // Inject component styles and remove cloak
         injectComponentStyles(componentFn, element)
-      
-        // Mark element as initialized (this will also mark in lifecycleManager)
-        markInitialized(element)
-      
-        return { 
-          element, 
-          componentName, 
-          instance: result 
+
+        // Element was already marked initialized before the body ran
+        // (mark-before-run). registerComponent above also marks it.
+
+        return {
+          element,
+          componentName,
+          instance: result
         }
       },
       onError: (error) => {
         logger.error(`Error initializing component ${componentName}:`, error)
+        // Roll back the mark-before-run flag so a component that threw can be
+        // retried on a later scan.
+        clearInitialized(element)
         return null
       }
     })

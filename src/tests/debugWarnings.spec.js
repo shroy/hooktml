@@ -81,61 +81,75 @@ describe('Debug Warnings', () => {
       )
     })
     
-    it('should warn about duplicate style injections when debug is enabled', () => {
+    it('should log (not warn) about duplicate style injections when debug is enabled', () => {
       // Mock config to enable debug mode
       vi.spyOn(configModule, 'getConfig').mockReturnValue({
         componentSelectorMode: 'class',
         debug: true
       })
-      
+      // logger.log reads isDebug() directly (issue #32), so stub it too.
+      vi.spyOn(configModule, 'isDebug').mockReturnValue(true)
+
       // Component with styles
       function DuplicateComponent() {}
       DuplicateComponent.styles = 'color: red;'
-      
-      // First injection should succeed without warnings
+
+      // First injection should succeed
       injectComponentStyles(DuplicateComponent, element)
-      
-      // Reset spy to clearly see next call
+
+      // Reset spies to clearly see the next call
       consoleWarnSpy.mockClear()
-      
-      // Second injection should warn about duplicate
+      consoleLogSpy.mockClear()
+
+      // Second injection: duplicate is reported via a debug-gated log, deduped
+      // by component name -- it must NOT go to console.warn (that would spam).
       injectComponentStyles(DuplicateComponent, element)
-      
-      // Should warn about duplicate injection
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('Duplicate style injection skipped for component "DuplicateComponent"'),
         element
       )
+      expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('Duplicate style injection skipped'),
+        element
+      )
     })
-    
+
     it('should not warn about duplicate style injections when debug is disabled', () => {
       // Mock config to disable debug mode
       vi.spyOn(configModule, 'getConfig').mockReturnValue({
         componentSelectorMode: 'class',
         debug: false
       })
-      
+
       // Component with styles
       function DuplicateComponent() {}
       DuplicateComponent.styles = 'color: red;'
-      
+
       // Inject twice
       injectComponentStyles(DuplicateComponent, element)
       injectComponentStyles(DuplicateComponent, element)
-      
-      // Should not warn when debug is disabled
+
+      // Should not warn when debug is disabled (the duplicate notice is a
+      // debug-gated log, so it stays silent in production).
       expect(consoleWarnSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('Duplicate style injection skipped')
+      )
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('Duplicate style injection skipped'),
+        element
       )
     })
     
     it('should log successful style injection when debug is enabled', () => {
-      // Mock config to enable debug mode
+      // Mock config to enable debug mode. The success log goes through
+      // logger.log, which reads isDebug() (issue #32), so stub it too.
       vi.spyOn(configModule, 'getConfig').mockReturnValue({
         componentSelectorMode: 'class',
         debug: true
       })
-      
+      vi.spyOn(configModule, 'isDebug').mockReturnValue(true)
+
       // Component with styles
       function TestComponent() {}
       TestComponent.styles = 'color: blue;'

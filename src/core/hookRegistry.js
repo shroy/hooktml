@@ -2,15 +2,26 @@ import { isEmptyString, isFunction, isString } from '../utils/type-guards.js'
 import { logger } from '../utils/logger.js'
 
 /**
+ * Matches a valid hook name: the literal `use` followed by an uppercase
+ * letter and then any letters/digits (e.g. `useTooltip`, `useURLParser`).
+ *
+ * Requiring an uppercase letter immediately after `use` rejects plain words
+ * that merely start with those characters (`useful`, `usefoo`), which would
+ * otherwise produce a `[usefoo]`-style selector whose attributes then fail the
+ * `use-` extraction filter (issue #40).
+ * @type {RegExp}
+ */
+const VALID_HOOK_NAME = /^use[A-Z][A-Za-z0-9]*$/
+
+/**
  * Validates that a hook name follows the use* naming convention
  * @param {string} name - Hook name to validate
  * @returns {boolean} Whether the name is valid
  */
 const isValidHookName = (name) => {
   if (isEmptyString(name)) return false
-  
-  // Check if name starts with 'use' prefix
-  return name.startsWith('use') && name.length > 3
+
+  return VALID_HOOK_NAME.test(name)
 }
 
 /**

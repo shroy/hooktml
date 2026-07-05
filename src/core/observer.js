@@ -1,13 +1,12 @@
-import { scanComponents, initializeComponents } from './scanComponents.js'
 import { lifecycleManager } from './initialization.js'
-import { runCleanupFunctions } from './hookContext.js'
+import { runCleanupFunctions, registerCleanup } from './hookContext.js'
 import { isEmptyArray, isHTMLElement, isNonEmptyArray } from '../utils/type-guards.js'
 import { getConfig } from './config.js'
 import { tryCatch } from '../utils/try-catch.js'
 import { getRegisteredHooks } from './hookRegistry.js'
 import { getRegisteredComponentNames } from './registry.js'
 import { camelToKebab } from '../utils/strings.js'
-import { processElementHooks } from './scanDirectives.js'
+import { processElement } from './processElement.js'
 import { logger } from '../utils/logger.js'
 import { clearHookInstances } from './hookInstanceRegistry.js'
 
@@ -34,7 +33,12 @@ import { clearHookInstances } from './hookInstanceRegistry.js'
 const isElementNode = (node) => node.nodeType === Node.ELEMENT_NODE
 
 /**
- * Processes a mutation record
+ * Processes a mutation record.
+ *
+ * Handles per-record bookkeeping (removed-element teardown, children watchers)
+ * only. The element-tracking `refresh` is intentionally NOT called here — it is
+ * run once per callback batch by the observer (issue #31), so a batch of K
+ * records no longer triggers K whole-document scans.
  * @param {MutableObserverState} state - Observer state
  * @param {MutationRecord} mutation - Mutation record to process
    */
@@ -75,14 +79,19 @@ const processMutation = (state, mutation) => {
       return [element, ...descendants]
     })
 
+  // Include the mutation target (the parent whose childList changed). For
+  // removals the removed nodes are already detached, so watchers scoped to the
+  // still-attached parent only fire if we consult mutation.target directly.
+  const target = mutation.target
+  const targetElements = isHTMLElement(target) && isElementNode(target)
+    ? [/** @type {HTMLElement} */ (target)]
+    : []
+
   // Trigger children watchers for all affected elements
-  const affectedElements = [...removedElements, ...addedElements]
+  const affectedElements = [...removedElements, ...addedElements, ...targetElements]
   if (isNonEmptyArray(affectedElements)) {
     triggerChildrenWatchers(affectedElements)
   }
-
-  // Refresh to handle added nodes and attribute changes
-  refresh(state)
 }
 
 /**
@@ -126,13 +135,18 @@ const createElementObserver = (root, delegate) => {
 
   const mutationObserver = new MutationObserver((mutations) => {
     if (state.started) {
+      // Per-record bookkeeping (removals, children watchers) for the whole batch,
+      // then a single element-tracking refresh for the batch — not one per
+      // record — so a batch of K records causes one whole-document scan (issue #31).
       mutations.forEach(mutation => processMutation(state, mutation))
+      refresh(state)
     }
   })
 
   const observe = () =>
     mutationObserver.observe(root, {
       attributes: true,
+      attributeFilter: getObservedAttributes(),
       childList: true,
       subtree: true
     })
@@ -202,6 +216,25 @@ const createComponentSelector = (componentNames, prefix = '') => {
 }
 
 /**
+ * Builds the list of attribute names worth observing, so the MutationObserver
+ * only wakes on relevant attribute churn instead of every attribute change in
+ * the subtree (issue #31). Covers each registered hook directive attribute,
+ * the (prefixed) `use-component` attribute, and `class` (class-based components).
+ * @returns {string[]} Attribute names for `attributeFilter`
+ */
+const getObservedAttributes = () => {
+  const { formattedPrefix } = getConfig()
+  const hookNames = Array.from(getRegisteredHooks().keys())
+
+  const hookAttributes = hookNames.map(name => `${formattedPrefix}${camelToKebab(name)}`)
+
+  // `class` and `use-component` are always relevant: components can be matched
+  // by class name or by the (prefixed) use-component attribute, and either may
+  // be added to an already-present element after observation starts.
+  return [...hookAttributes, 'class', `${formattedPrefix}use-component`]
+}
+
+/**
  * Creates the HookTML delegate for element observation
  * @returns {ElementObserverDelegate} Delegate instance
  */
@@ -232,41 +265,31 @@ const createHookTMLDelegate = () => {
       return []
     }
 
-    // Find all matching elements
-    return Array.from(root.querySelectorAll(selectors.join(', ')))
-      .filter(isHTMLElement)
+    // Find all matching elements. Guard querySelectorAll so a malformed
+    // selector (e.g. from a bad attribute prefix) can never throw inside the
+    // MutationObserver callback and permanently break observation (issue #33).
+    const selector = selectors.join(', ')
+    return tryCatch({
+      fn: () => Array.from(root.querySelectorAll(selector)).filter(isHTMLElement),
+      onError: (error) => {
+        if (getConfig().debug) {
+          logger.error(`Invalid element selector "${selector}":`, error)
+        }
+        return []
+      }
+    })
   }
 
   /**
-   * Processes a new element by applying hooks and initializing components
+   * Processes a new element by initializing its component then applying its
+   * hooks. Delegates to the shared processElement() so the dynamic (observer)
+   * path uses the exact same order as the static scan path. (#24)
    * @param {HTMLElement} element - Element to process
    */
   const addElement = (element) => {
     tryCatch({
       fn: () => {
-        // Process hooks on this specific element
-        const { formattedPrefix } = getConfig()
-        const hooks = getRegisteredHooks()
-        const hookNames = Array.from(hooks.keys())
-
-        if (isNonEmptyArray(hookNames)) {
-          const hookSelector = createHookSelector(hookNames, formattedPrefix)
-          if (element.matches(hookSelector)) {
-            processElementHooks(element)
-          }
-        }
-
-        // Process components
-        const componentNames = getRegisteredComponentNames()
-        if (isNonEmptyArray(componentNames)) {
-          const componentSelector = createComponentSelector(componentNames, formattedPrefix)
-          if (element.matches(componentSelector)) {
-            const foundComponents = scanComponents().filter(comp => comp.element === element)
-            if (isNonEmptyArray(foundComponents)) {
-              initializeComponents(foundComponents)
-            }
-          }
-        }
+        processElement(element)
       },
       onError: (error) => {
         if (getConfig().debug) {
@@ -327,6 +350,13 @@ export const registerChildrenWatcher = (element, prefix, callback) => {
 
   const cleanups = childrenCleanup.get(element) || []
   childrenCleanup.set(element, [...cleanups, cleanup])
+
+  // Also tie disposal to the element's lifecycle via the shared, element-scoped
+  // cleanup path (runCleanupFunctions). The childrenCleanup WeakMap above only runs
+  // from the live MutationObserver removal branch, which is silent when the observer
+  // is stopped / paused / never started — so on its own it strongly leaks the watcher
+  // (and its element) in those cases (BUG-17).
+  registerCleanup(element, cleanup)
 }
 
 /**
@@ -338,8 +368,17 @@ const triggerChildrenWatchers = (elements) => {
 
   elements.forEach(element => {
     childrenWatchers.forEach(watcher => {
+      // Sweep out watchers whose element has left the DOM. Disposal is normally
+      // driven by the element lifecycle (runCleanupFunctions) / the mutation stream,
+      // but if a detached element is never routed through either, this guard prevents
+      // a stale watcher from firing for a dead element (BUG-17).
+      if (!watcher.element.isConnected) {
+        childrenWatchers.delete(watcher)
+        return
+      }
+
       // Check if this element is a descendant of or is the watched element
-      if (watcher.element === element || (watcher.element.isConnected && watcher.element.contains(element))) {
+      if (watcher.element === element || watcher.element.contains(element)) {
         if (!triggeredWatchers.has(watcher)) {
           triggeredWatchers.add(watcher)
           tryCatch({

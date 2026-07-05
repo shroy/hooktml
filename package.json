@@ -12,7 +12,9 @@
     },
     "./package.json": "./package.json"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./index.global.js"
+  ],
   "keywords": [
     "html",
     "components",

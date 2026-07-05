@@ -4,7 +4,7 @@ import {
   getRegisteredHooks,
   getRegisteredChainableHooks
 } from './core/hookRegistry.js'
-import { useEffect } from './core/hookContext.js'
+import { useEffect, onCleanup } from './core/hookContext.js'
 import { useChildren } from './hooks/useChildren.js'
 import { useEvents } from './hooks/useEvents.js'
 import { useClasses } from './hooks/useClasses.js'
@@ -15,6 +15,7 @@ import { with as withEl } from './core/with.js'
 import { createObserver } from './core/observer.js'
 import { scanComponents, initializeComponents } from './core/scanComponents.js'
 import { scanDirectives } from './core/scanDirectives.js'
+import { injectCloakStyles } from './core/styleInjection.js'
 import { getRegisteredComponentNames, registerComponent, registerComponentByName } from './core/registry.js'
 import { initConfig, getConfig } from './core/config.js'
 import { signal } from './core/signal.js'
@@ -64,7 +65,16 @@ export const start = async (options) => {
     })
   }
 
+  // Inject the shared style tag + [data-hooktml-cloak] hiding rule immediately,
+  // so cloaked elements are hidden as soon as the runtime starts -- even when
+  // only style-less components are registered (prevents FOUC).
+  injectCloakStyles()
+
   // Create and start the observer
+  // Create and start the observer.
+  // Stop any previous observer first so start() is idempotent and never leaks a
+  // live MutationObserver still registered on document.documentElement (BUG-15).
+  observerRef.current?.stop()
   observerRef.current = createObserver()
   observerRef.current.start()
 
@@ -108,6 +118,7 @@ export {
   registerHook,
   registerChainableHook,
   useEffect,
+  onCleanup,
   useChildren,
   useEvents,
   useClasses,

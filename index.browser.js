@@ -4,7 +4,7 @@ import {
   getRegisteredHooks,
   getRegisteredChainableHooks
 } from './src/core/hookRegistry.js'
-import { useEffect } from './src/core/hookContext.js'
+import { useEffect, onCleanup } from './src/core/hookContext.js'
 import { useChildren } from './src/hooks/useChildren.js'
 import { useEvents } from './src/hooks/useEvents.js'
 import { useClasses } from './src/hooks/useClasses.js'
@@ -46,7 +46,10 @@ const start = (options) => {
     logger.log(`Using attribute prefix: "${attributePrefix}"`)
   }
 
-  // Create and start the observer
+  // Create and start the observer.
+  // Stop any previous observer first so start() is idempotent and never leaks a
+  // live MutationObserver still registered on document.documentElement (BUG-15).
+  observerRef.current?.stop()
   observerRef.current = createObserver()
   observerRef.current.start()
 
@@ -92,6 +95,7 @@ export {
   registerHook,
   registerChainableHook,
   useEffect,
+  onCleanup,
   useChildren,
   useEvents,
   useClasses,
@@ -112,6 +116,7 @@ const HookTML = {
   registerHook,
   registerChainableHook,
   useEffect,
+  onCleanup,
   useChildren,
   useEvents,
   useClasses,
