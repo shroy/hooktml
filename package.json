@@ -13,8 +13,7 @@
     "./package.json": "./package.json"
   },
   "sideEffects": [
-    "./index.global.js",
-    "./src/components/Button.js"
+    "./index.global.js"
   ],
   "keywords": [
     "html",
