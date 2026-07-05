@@ -191,69 +191,10 @@ describe('useEvents', () => {
     expect(() => useEvents(element, 'string')).toThrow()
   })
 
-  // FIXME(#12): un-skip when BUG-1 (useEvents signal-handler unwrap) is fixed by batch B2.
-  // These assertions (raw `handler1`/`handler2` bound to the listener, and the signal
-  // handler firing) describe the CORRECT post-fix behavior. On current code the listener
-  // is bound with a wrapper and signal handlers never fire, so they fail once
-  // withHookContext stops swallowing AssertionErrors (#45). Previously green only because
-  // the AssertionError was eaten inside the withHookContext callback.
-  it.skip('should reactively update event handlers when signal values change', () => {
-    // Spy on the effect execution
-    const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
-
-    // Create handlers
-    const handler1 = vi.fn()
-    const handler2 = vi.fn()
-
-    // Create a signal with the first handler
-    const clickHandlerSignal = signal(handler1)
-
-    // Setup spies
-    const addEventSpy = vi.spyOn(element, 'addEventListener')
-    const removeEventSpy = vi.spyOn(element, 'removeEventListener')
-
-    withHookContext(element, () => {
-      // Apply events using signal
-      useEvents(element, {
-        click: clickHandlerSignal
-      })
-
-      // Verify initial handler was attached
-      expect(addEventSpy).toHaveBeenCalledWith('click', handler1)
-
-      // Trigger the event and verify handler1 is called
-      element.click()
-      expect(handler1).toHaveBeenCalledTimes(1)
-      expect(handler2).toHaveBeenCalledTimes(0)
-
-      // Reset spies for cleaner assertions
-      addEventSpy.mockClear()
-      removeEventSpy.mockClear()
-
-      // Change the handler in the signal
-      clickHandlerSignal.value = handler2
-
-      // Extract and call the effect callback
-      const effectCall = executeEffectSpy.mock.calls[0]
-      const effectFn = effectCall[0]
-      effectFn()
-
-      // Verify old handler was removed and new one was added
-      expect(removeEventSpy).toHaveBeenCalledWith('click', handler1)
-      expect(addEventSpy).toHaveBeenCalledWith('click', handler2)
-
-      // Trigger event again and verify handler2 is now called
-      element.click()
-      expect(handler1).toHaveBeenCalledTimes(1) // Still just once
-      expect(handler2).toHaveBeenCalledTimes(1) // Now called
-    })
-  })
-
-  // FIXME(#12): un-skip when BUG-1 (useEvents signal-handler unwrap) is fixed by batch B2.
-  // The mixed direct/signal expectations rely on the signal-wrapped mouseover handler
-  // firing, which BUG-1 breaks. Previously green only because the AssertionError was
-  // swallowed inside the withHookContext callback (#45).
-  it.skip('should handle a mix of signal and direct event handlers', () => {
+  // Mixed direct + signal handlers both fire, and swapping the signal's handler takes
+  // effect (dispatch-time resolution, #12). The obsolete raw-handler-binding test that
+  // used to precede this is covered behaviorally by src/tests/regression/issue-12.spec.js.
+  it('should handle a mix of signal and direct event handlers', () => {
     // Spy on the effect execution
     const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
 
