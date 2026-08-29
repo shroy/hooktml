@@ -45,44 +45,50 @@ export const useEvents = (elementOrElements, eventMap, deps = []) => {
   const implicitDeps = Object.values(eventMap).filter(isSignal)
   const allDeps = implicitDeps.concat(deps);
 
+  // Maps event names to per-element wrapper functions (parallel to `elements`)
   const currentHandlers = new Map()
 
-  const updateEventListeners = () => {
-    currentHandlers.forEach((handler, eventName) => {
-      elements.forEach(element => {
-        element.removeEventListener(eventName, handler)
+  const removeEventListeners = () => {
+    currentHandlers.forEach((wrappers, eventName) => {
+      elements.forEach((element, index) => {
+        element.removeEventListener(eventName, wrappers[index])
       })
     })
     currentHandlers.clear()
+  }
 
-    const validHandlers = Object.entries(eventMap).filter(([eventName, handlerOrSignal]) => {
-      const handler = isSignal(handlerOrSignal)
-        ? handlerOrSignal.value
-        : handlerOrSignal
+  const updateEventListeners = () => {
+    removeEventListeners()
 
-      if (!isFunction(handler)) {
-        logger.warn(`Event handler for '${eventName}' is not a function, skipping`)
-        return
-      }
+    const validHandlers = Object.entries(eventMap)
+      .map(([eventName, handlerOrSignal]) => [
+        eventName,
+        isSignal(handlerOrSignal) ? handlerOrSignal.value : handlerOrSignal
+      ])
+      .filter(([eventName, handler]) => {
+        if (!isFunction(handler)) {
+          logger.warn(`Event handler for '${eventName}' is not a function, skipping`)
+          return false
+        }
 
-      return [eventName, handler]
-    })
+        return true
+      })
 
-    elements.forEach((element, index) => {
-      validHandlers.forEach(([eventName, handler]) => {
+    validHandlers.forEach(([eventName, handler]) => {
+      const wrappers = elements.map((element, index) => {
         /**
          * @param {Event} event
          */
         const handlerWithIndex = (event) => {
-          if (isFunction(handler)) {
-            handler(event, index)
-          }
+          handler(event, index)
         }
 
         element.addEventListener(eventName, handlerWithIndex)
 
-        currentHandlers.set(eventName, handlerWithIndex)
+        return handlerWithIndex
       })
+
+      currentHandlers.set(eventName, wrappers)
     })
   }
 
@@ -94,12 +100,5 @@ export const useEvents = (elementOrElements, eventMap, deps = []) => {
     }, allDeps)
   }
 
-  return () => {
-    currentHandlers.forEach((handler, eventName) => {
-      elements.forEach(element => {
-        element.removeEventListener(eventName, handler)
-      })
-    })
-    currentHandlers.clear()
-  }
+  return removeEventListeners
 } 

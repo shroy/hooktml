@@ -985,7 +985,7 @@ export const Dialog = (el, props) => {
 Other components can access this context:
 
 ```js
-const dialog = el.closest(".Dialog")?.component?.context;
+const dialog = el.closest(".Dialog")?.component;
 dialog?.open();
 ```
 

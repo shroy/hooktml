@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useEvents } from '../hooks/useEvents.js'
 import { signal } from '../core/signal.js'
 import { withHookContext } from '../core/hookContext.js'
-import * as hookContext from '../core/hookContext.js'
 import { logger } from '../utils/logger.js'
 
 describe('useEvents', () => {
@@ -191,10 +190,21 @@ describe('useEvents', () => {
     expect(() => useEvents(element, 'string')).toThrow()
   })
 
-  it('should reactively update event handlers when signal values change', () => {
-    // Spy on the effect execution
-    const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
+  it('should invoke handlers provided as signals', () => {
+    const handler = vi.fn()
+    const handlerSignal = signal(handler)
 
+    withHookContext(element, () => {
+      useEvents(element, { click: handlerSignal })
+    })
+
+    element.click()
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith(expect.any(Event), 0)
+  })
+
+  it('should reactively update event handlers when signal values change', () => {
     // Create handlers
     const handler1 = vi.fn()
     const handler2 = vi.fn()
@@ -202,51 +212,28 @@ describe('useEvents', () => {
     // Create a signal with the first handler
     const clickHandlerSignal = signal(handler1)
 
-    // Setup spies
-    const addEventSpy = vi.spyOn(element, 'addEventListener')
-    const removeEventSpy = vi.spyOn(element, 'removeEventListener')
-
     withHookContext(element, () => {
       // Apply events using signal
       useEvents(element, {
         click: clickHandlerSignal
       })
-
-      // Verify initial handler was attached
-      expect(addEventSpy).toHaveBeenCalledWith('click', handler1)
-
-      // Trigger the event and verify handler1 is called
-      element.click()
-      expect(handler1).toHaveBeenCalledTimes(1)
-      expect(handler2).toHaveBeenCalledTimes(0)
-
-      // Reset spies for cleaner assertions
-      addEventSpy.mockClear()
-      removeEventSpy.mockClear()
-
-      // Change the handler in the signal
-      clickHandlerSignal.value = handler2
-
-      // Extract and call the effect callback
-      const effectCall = executeEffectSpy.mock.calls[0]
-      const effectFn = effectCall[0]
-      effectFn()
-
-      // Verify old handler was removed and new one was added
-      expect(removeEventSpy).toHaveBeenCalledWith('click', handler1)
-      expect(addEventSpy).toHaveBeenCalledWith('click', handler2)
-
-      // Trigger event again and verify handler2 is now called
-      element.click()
-      expect(handler1).toHaveBeenCalledTimes(1) // Still just once
-      expect(handler2).toHaveBeenCalledTimes(1) // Now called
     })
+
+    // Trigger the event and verify handler1 is called
+    element.click()
+    expect(handler1).toHaveBeenCalledTimes(1)
+    expect(handler2).toHaveBeenCalledTimes(0)
+
+    // Change the handler in the signal; the effect re-runs via subscription
+    clickHandlerSignal.value = handler2
+
+    // Trigger event again and verify handler2 is now called
+    element.click()
+    expect(handler1).toHaveBeenCalledTimes(1) // Still just once
+    expect(handler2).toHaveBeenCalledTimes(1) // Now called
   })
 
   it('should handle a mix of signal and direct event handlers', () => {
-    // Spy on the effect execution
-    const executeEffectSpy = vi.spyOn(hookContext, 'useEffect')
-
     // Create handlers
     const clickHandler = vi.fn()
     const mouseoverHandler = vi.fn()
@@ -261,31 +248,67 @@ describe('useEvents', () => {
         click: clickHandler,         // Direct function
         mouseover: mouseoverSignal   // Signal
       })
-
-      // Simulate events and verify initial handlers
-      element.click()
-      element.dispatchEvent(new MouseEvent('mouseover'))
-
-      expect(clickHandler).toHaveBeenCalledTimes(1)
-      expect(mouseoverHandler).toHaveBeenCalledTimes(1)
-      expect(newMouseoverHandler).toHaveBeenCalledTimes(0)
-
-      // Change only the signal handler
-      mouseoverSignal.value = newMouseoverHandler
-
-      // Extract and call the effect callback
-      const effectCall = executeEffectSpy.mock.calls[0]
-      const effectFn = effectCall[0]
-      effectFn()
-
-      // Simulate events again
-      element.click()
-      element.dispatchEvent(new MouseEvent('mouseover'))
-
-      // Verify click handler still works, and mouseover changed
-      expect(clickHandler).toHaveBeenCalledTimes(2)       // Incremented
-      expect(mouseoverHandler).toHaveBeenCalledTimes(1)   // Unchanged
-      expect(newMouseoverHandler).toHaveBeenCalledTimes(1) // Now called
     })
+
+    // Simulate events and verify initial handlers
+    element.click()
+    element.dispatchEvent(new MouseEvent('mouseover'))
+
+    expect(clickHandler).toHaveBeenCalledTimes(1)
+    expect(mouseoverHandler).toHaveBeenCalledTimes(1)
+    expect(newMouseoverHandler).toHaveBeenCalledTimes(0)
+
+    // Change only the signal handler; the effect re-runs via subscription
+    mouseoverSignal.value = newMouseoverHandler
+
+    // Simulate events again
+    element.click()
+    element.dispatchEvent(new MouseEvent('mouseover'))
+
+    // Verify click handler still works, and mouseover changed
+    expect(clickHandler).toHaveBeenCalledTimes(2)       // Incremented
+    expect(mouseoverHandler).toHaveBeenCalledTimes(1)   // Unchanged
+    expect(newMouseoverHandler).toHaveBeenCalledTimes(1) // Now called
   })
-}) 
+
+  it('should remove listeners from every element on cleanup', () => {
+    const elements = [0, 1, 2].map(() => {
+      const el = document.createElement('button')
+      document.body.appendChild(el)
+      return el
+    })
+    const handler = vi.fn()
+
+    const cleanup = useEvents(elements, { click: handler })
+    cleanup()
+
+    elements.forEach(el => el.click())
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('should not leak or stack listeners across reactive re-runs with multiple elements', () => {
+    const el1 = document.createElement('button')
+    const el2 = document.createElement('button')
+    document.body.append(el1, el2)
+
+    const handler1 = vi.fn()
+    const handler2 = vi.fn()
+    const clickHandlerSignal = signal(handler1)
+
+    withHookContext(el1, () => {
+      useEvents([el1, el2], { click: clickHandlerSignal })
+    })
+
+    el1.click()
+    el2.click()
+    expect(handler1).toHaveBeenCalledTimes(2)
+
+    clickHandlerSignal.value = handler2
+
+    el1.click()
+    el2.click()
+    expect(handler1).toHaveBeenCalledTimes(2) // Old handler fully detached
+    expect(handler2).toHaveBeenCalledTimes(2) // New handler fires exactly once per element
+  })
+})

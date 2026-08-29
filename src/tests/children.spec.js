@@ -24,6 +24,7 @@ test('should extract children correctly', () => {
   // Verify
   expect(children).toEqual({
     header,
+    headers: [header],
     item: item1,
     items: [item1, item2]
   })
@@ -45,7 +46,9 @@ test('should handle multi-word component names with kebab-case attributes', () =
 
   expect(children).toEqual({
     input,
-    submit: button
+    inputs: [input],
+    submit: button,
+    submits: [button]
   })
 })
 
@@ -71,7 +74,8 @@ test('should handle nested components', () => {
 
   // Verify
   expect(children).toEqual({
-    header
+    header,
+    headers: [header]
   })
 })
 
@@ -102,9 +106,11 @@ test('should handle mixed single and multiple children', () => {
   // Verify
   expect(children).toEqual({
     header,
+    headers: [header],
     item: item1,
     items: [item1, item2],
-    footer
+    footer,
+    footers: [footer]
   })
 })
 
@@ -139,8 +145,48 @@ test('should NOT extract children from nested components', () => {
   const children = extractChildren(outerDialog, 'Dialog')
 
   expect(children).toEqual({
-    header: directChild
+    header: directChild,
+    headers: [directChild]
   })
   expect(children.content).toBeUndefined()
   expect(children.footer).toBeUndefined()
-}) 
+})
+
+test('should extract children that appear after a nested same-named component', () => {
+  // Setup
+  const outerDialog = document.createElement('div')
+  outerDialog.classList.add('Dialog')
+
+  const button1 = document.createElement('button')
+  button1.setAttribute('dialog-button', '')
+  outerDialog.appendChild(button1)
+
+  // Nested dialog whose subtree must be excluded
+  const innerDialog = document.createElement('div')
+  innerDialog.classList.add('Dialog')
+  outerDialog.appendChild(innerDialog)
+
+  const nestedButton = document.createElement('button')
+  nestedButton.setAttribute('dialog-button', '')
+  innerDialog.appendChild(nestedButton)
+
+  // Siblings after the nested dialog must still be collected
+  const button2 = document.createElement('button')
+  button2.setAttribute('dialog-button', '')
+  outerDialog.appendChild(button2)
+
+  const footer = document.createElement('footer')
+  footer.setAttribute('dialog-footer', '')
+  outerDialog.appendChild(footer)
+
+  // Execute
+  const children = extractChildren(outerDialog, 'Dialog')
+
+  // Verify
+  expect(children).toEqual({
+    button: button1,
+    buttons: [button1, button2],
+    footer,
+    footers: [footer]
+  })
+})
