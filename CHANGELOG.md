@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-28
+
+### Fixed
+
+- **`useEvents`**: Handlers passed as signals never fired — the signal object was attached instead of its unwrapped function value
+- **`useEvents`**: With multiple elements, cleanup and reactive re-runs only detached the last element's listener, leaking the rest and double-firing handlers after signal changes
+- **`extractChildren`**: A nested same-named component halted the entire child scan, silently dropping children that appeared later in document order — now only the nested component's subtree is excluded
+- **Node ESM entry**: `src/hooks/useText.js` used extensionless imports, breaking `import 'hooktml'` for non-bundler Node consumers
+- **README**: Component context is accessed via `el.component`, not `el.component.context`
+
+### Changed
+
+- **`extractChildren` / `props.children`**: Both singular and plural keys are now always created, matching `useChildren` and the documented behavior (previously the plural key only existed with two or more matches)
+
 ## [0.6.3] - 2026-06-20
 
 ### Fixed

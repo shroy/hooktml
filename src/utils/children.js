@@ -1,5 +1,5 @@
 import { kebabToCamel, pluralize, camelToKebab } from './strings.js'
-import { isArray, isHTMLElement } from './type-guards.js'
+import { isHTMLElement } from './type-guards.js'
 import { getConfig } from '../core/config.js'
 
 /**
@@ -17,27 +17,9 @@ export const hasSameComponent = (element, componentName) => {
 }
 
 /**
- * Adds a child to a pluralized key
- * @param {Record<string, Element | Element[]>} children - The children object
- * @param {string} key - The key to add the child to
- * @param {Element} child - The child to add
- */
-export const addPluralizedChild = (children, key, child) => {
-  const pluralKey = pluralize(key)
-
-  if (pluralKey in children) {
-    // If the pluralized key already exists, just push the new child
-    if (isArray(children[pluralKey])) {
-      children[pluralKey].push(child)
-    }
-  } else {
-    // Create a new array with first child and new child
-    children[pluralKey] = [/** @type {Element} */(children[key]), child]
-  }
-}
-
-/**
- * Extracts children from an element's subtree based on component name
+ * Extracts children from an element's subtree based on component name.
+ * Returns both singular and plural keys for each found attribute,
+ * matching the behavior of the useChildren hook.
  * @param {Element} element - The root element
  * @param {string} componentName - The PascalCase component name
  * @returns {Record<string, Element | Element[]>} The extracted children
@@ -45,32 +27,43 @@ export const addPluralizedChild = (children, key, child) => {
 export const extractChildren = (element, componentName) => {
   const { formattedPrefix } = getConfig()
   const prefix = `${formattedPrefix}${camelToKebab(componentName)}-`
-  /** @type {Record<string, Element | Element[]>} */
-  const children = {}
+  /** @type {Record<string, Element[]>} */
+  const elementsByKey = {}
 
   // Get all descendants
   const descendants = Array.from(element.getElementsByTagName('*'))
 
-  // Use some to short-circuit when the component is found
-  descendants.some((child) => {
-    if (hasSameComponent(child, componentName)) {
-      return true
+  // Nested same-named components own their subtrees — exclude them without
+  // stopping the scan for children that appear later in document order
+  const nestedRoots = descendants.filter(child => hasSameComponent(child, componentName))
+
+  descendants.forEach((child) => {
+    if (nestedRoots.some(root => root === child || root.contains(child))) {
+      return
     }
+
     // Check all attributes
     Array.from(child.attributes).forEach(({ name }) => {
       if (name.startsWith(prefix)) {
         const key = kebabToCamel(name.slice(prefix.length))
 
-        if (children[key]) {
-          addPluralizedChild(children, key, child)
+        if (elementsByKey[key]) {
+          elementsByKey[key].push(child)
         } else {
-          children[key] = child
+          elementsByKey[key] = [child]
         }
       }
     })
+  })
 
-    return false
+  /** @type {Record<string, Element | Element[]>} */
+  const children = {}
+
+  // Create both singular and plural keys for all found elements
+  Object.entries(elementsByKey).forEach(([key, elements]) => {
+    children[key] = elements[0]
+    children[pluralize(key)] = elements
   })
 
   return children
-} 
+}
